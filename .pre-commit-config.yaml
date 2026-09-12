@@ -1,0 +1,12 @@
+repos:
+  - repo: local
+    hooks:
+      - id: docstring-linter
+        name: K-BRAIN Docstring Formatter (check)
+        entry: python lint/docstring_linter.py --check
+        language: system
+        files: \.py$
+        types: [python]
+        stages: [commit]
+        pass_filenames: true
+        verbose: true

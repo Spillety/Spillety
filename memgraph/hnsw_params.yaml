@@ -1,0 +1,24 @@
+# HNSW vector index configuration for Memgraph
+# Used for nearest scam cluster query on hyperbolic embeddings
+
+index:
+  name: hyperbolic_embedding_hnsw
+  type: hnsw
+  dimensions: 128          # 128D float32 — sweet spot for hierarchy vs. precision
+  metric: cosine           # Cosine distance for normalized embeddings
+
+training:
+  ef_construction: 200     # Higher = better index quality, slower build
+  M: 32                    # Max connections per node — balances recall vs. memory
+
+query:
+  ef_runtime: 50           # Runtime ef for search (lower than ef_construction for speed)
+
+memory_estimate:
+  # Per-node overhead: ~20-30% on top of raw vectors
+  # 100M nodes × 128D × 4 bytes = ~51.2 GB raw + ~15 GB overhead ≈ 65 GB
+  raw_vector_gb_per_100m_nodes: 51.2
+  overhead_percent: 30
+
+# # ponytail: HNSW parameter tuning, add when recall@k < 0.95
+# Increase ef_construction or M if recall@k falls below 0.95 benchmark threshold

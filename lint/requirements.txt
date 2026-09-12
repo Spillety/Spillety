@@ -1,0 +1,3 @@
+# K-BRAIN Linter Dependencies
+# Install with: pip install -r lint/requirements.txt
+pytest>=7.0.0

@@ -1,0 +1,64 @@
+groups:
+  - name: kafka-alerts
+    rules:
+      - alert: HighDLQRate
+        expr: |
+          rate(kafka_consumergroup_lag_sum{consumergroup="raw-events-consumer"}[5m])
+          / rate(kafka_topic_partition_current_offset{topic="raw-events"}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "DLQ rate exceeds 5% threshold"
+          description: "DLQ rate is {{ $value | printf \"%.2f\" }} — consumer group paused. Manual confirmation required."
+      - alert: HighConsumerLag
+        expr: |
+          kafka_consumergroup_lag_sum{consumergroup="raw-events-consumer"} > 10000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Consumer lag exceeds 10000 messages"
+          description: "Current lag: {{ $value }} messages. Check consumer throughput."
+      - alert: PartitionSkew
+        expr: |
+          max(kafka_topic_partition_current_offset{topic="raw-events"}) by (partition)
+          /
+          min(kafka_topic_partition_current_offset{topic="raw-events"}) by (partition) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Partition skew detected on raw-events"
+          description: "Max/min throughput ratio > 10x. Possible hot partition from exchange address."
+      - alert: SchemaRegistryErrors
+        expr: |
+          increase(schema_registry_error_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Schema Registry errors detected"
+          description: "Schema Registry reported errors. Check compatibility and availability."
+  - name: flink-alerts
+    rules:
+      - alert: HighDeserializationErrorRate
+        expr: |
+          rate(flink_taskmanager_job_task_operator_numExceptionsTotal{operator="deserializer"}[5m])
+          /
+          rate(flink_taskmanager_job_task_operator_numRecordsInPerSecond{operator="deserializer"}[5m]) > 0.0001
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Deserialization error rate exceeds 0.01%"
+          description: "Flink deserialization errors detected. Check protobuf schemas."
+      - alert: FlinkCheckpointFailure
+        expr: |
+          rate(flink_jobmanager_job_failedCheckpoints_rate[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Flink checkpoint failure detected"
+          description: "Flink is failing checkpoints. State may be inconsistent."

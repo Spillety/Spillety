@@ -32,12 +32,12 @@
 - **Indexes:** Label index + property index на `address` (hash), full-text index не нужен (адреса — hex strings). Vector index (HNSW) для hyperbolic embeddings — **обязателен** для nearest scam cluster query.
 - **Partitioning:** Memgraph не шардируется нативно. Для MVP — single node с 256GB RAM. Для production — TigerGraph или NebulaGraph.
 
-**[ ] 2.2. Hyperbolic Embeddings Storage**
+**[x] 2.2. Hyperbolic Embeddings Storage** ✅ Done — `TASKS/hyperbolic-embeddings/03-design-hyperbolic-embeddings.md`, `TASKS/hyperbolic-embeddings/04-structure-hyperbolic-embeddings.md`
 - **Формат:** float32 vector (128D) как node property. 128D — sweet spot: 64D теряет иерархию, 256D не даёт прироста для графа такого размера.
 - **Обновление:** Incremental при каждом event (lazy inference). Полный пересчёт — nightly.
 - **HNSW:** Да, для nearest scam cluster. Без него counterfactual generation занимает O(n) вместо O(log n).
 
-**[ ] 2.3. Iceberg Audit Trail**
+**[x] 2.3. Iceberg Audit Trail** ✅ Done — `TASKS/iceberg-audit-trail/03-design-iceberg-audit-trail.md`, `TASKS/iceberg-audit-trail/04-structure-iceberg-audit-trail.md`
 - **Iceberg на S3 + Trino.** Delta Lake только если Spark ecosystem. Iceberg — открытый формат, проще для регулятора.
 - **Schema evolution:** Backward-compatible only. Новые поля — optional. Breaking changes — через new table version.
 - **Partitioning:** `date` (daily). Alert_id hash — не нужен (queries по времени).
@@ -49,13 +49,13 @@
 
 ## 3. Model Architecture
 
-**[ ] 3A. Causal Attention Implementation**
+**[x] 3A. Causal Attention Implementation** ✅ Done — `TASKS/causal-attention/03-design-causal-attention.md`, `TASKS/causal-attention/04-structure-causal-attention.md`
 - **Causal discovery:** NOTEARS для initial DAG (differentiable, O(n³) но n = local subgraph size ~100, не глобальный граф). Для production — GES с domain knowledge prior.
 - **Initial DAG:** Domain knowledge (expert graph) для типов рёбер (TRANSACTS → risk, MENTIONED_IN → risk), data-driven для весов. Гибрид.
 - **Covariates для backdoor:** Address features (age, tx_count, unique_counterparties), transaction amount, time-of-day, chain. Confounders: exchange internal transfers (помечать как `is_exchange_internal` если source и target в одном exchange cluster).
 - **Library:** PyTorch Geometric Temporal (PyG-T) для temporal layers, кастомная реализация causal attention на PyTorch.
 
-**[ ] 3B. Hyperbolic Message Passing**
+**[x] 3B. Hyperbolic Message Passing** ✅ Done — `TASKS/hyperbolic-message-passing/03-design-hyperbolic-message-passing.md`, `TASKS/hyperbolic-message-passing/04-structure-hyperbolic-message-passing.md`
 - **Architecture:** Lorentz model (численно стабильнее Poincaré ball) для message passing. Poincaré только для visualization.
 - **Curvature:** Learnable per-layer, initialized c = -1.0. Adaptive per-node не нужен — иерархия глобальна.
 - **Numerical stability:** Clamp tangent vectors to norm ≤ 1e-5 before exponential map. Gradient clipping (max_norm = 1.0).
@@ -67,17 +67,17 @@
 
 ## 4. Model Training Pipeline
 
-**[ ] 4.1. Dataset & Labels**
+**[x] 4.1. Dataset & Labels** ✅ Done — `TASKS/dataset-labels/03-design-dataset-labels.md`, `TASKS/dataset-labels/04-structure-dataset-labels.md`
 - **Dataset:** Elliptic++ (v2) + internal labeled data. Elliptic v1 устарел (2014-2015).
 - **Labels:** Multi-class (scam, ransomware, terrorist_financing, sanctions, mixer, legitimate). Binary теряет granularity для explainability.
 - **Temporal split:** Train: 2014-2015, Val: 2016 H1, Test: 2016 H2. Случайный split = data leakage.
 - **Negative sampling:** Hard negatives (near-miss: кошельки с похожими фичами, но legitimate). Random sampling даёт слишком лёгкую задачу.
 
-**[ ] 4.2. Loss & Optimization**
+**[x] 4.2. Loss & Optimization** ✅ Done — `TASKS/loss-optimization/03-design-loss-optimization.md`, `TASKS/loss-optimization/04-structure-loss-optimization.md`
 - **Loss:** Focal loss (γ=2.0) для imbalanced classes + contrastive loss (τ=0.1) для hyperbolic embeddings.
 - **Distributed:** FSDP для графа > 10M nodes. DDP не влезет в память.
 
-**[ ] 4.3. Feature Store & Data Quality**
+**[x] 4.3. Feature Store & Data Quality** ✅ Done — `TASKS/feature-store-quality/03-design-feature-store-quality.md`, `TASKS/feature-store-quality/04-structure-feature-store-quality.md`
 - **Feature Store:** Feast или Tecton — для feature consistency между train и serve. Даже если не используется в inference, нужен для training.
 - **Data Quality Monitoring:** Great Expectations для on-chain events. Bad data → bad model. Schema validation + anomaly detection на raw events.
 
@@ -87,20 +87,20 @@
 
 ## 5. Explainability & Inference
 
-**[ ] 5A. Hawkes Temporal Encoding**
+**[x] 5A. Hawkes Temporal Encoding** ✅ Done — `TASKS/hawkes-temporal/03-design-hawkes-temporal.md`, `TASKS/hawkes-temporal/04-structure-hawkes-temporal.md`
 - **Kernel:** Exponential. Power-law лучше для long-range, но экспоненциальный имеет closed-form λ(t) → latency < 1ms.
 - **Online estimation:** Online SGD с regret bound O(log T). Не EM — EM batch.
 - **Baseline μ(t):** Time-varying (hourly/daily seasonality). Константа игнорирует паттерны (атаки в нерабочие часы).
 - **Negative reinforcement:** Не нужен для AML (self-exciting достаточно).
 - **Latency:** Closed-form exponential kernel даёт O(1) update.
 
-**[ ] 5B. Lazy Inference Engine**
+**[x] 5B. Lazy Inference Engine** ✅ Done — `TASKS/lazy-inference/03-design-lazy-inference.md`, `TASKS/lazy-inference/04-structure-lazy-inference.md`
 - **Subgraph extraction:** BFS depth 2 от `from_address` И `to_address`, union. Depth 2 — оптимально: depth 1 теряет контекст, depth 3 взрывает сложность.
 - **Batch inference:** Micro-batch (32-64 events) для GPU utilization, но с latency budget < 100ms. Flink buffer → GPU worker.
 - **Caching:** LRU cache для hot addresses (exchanges, mixers) — embeddings не меняются часто.
 - **Latency budget:** 20ms subgraph extraction, 60ms forward pass, 20ms explanation. GPU: A10G или T4.
 
-**[ ] 5C. Structured Explainability Module**
+**[x] 5C. Structured Explainability Module** ✅ Done — `TASKS/explainability-module/03-design-explainability-module.md`, `TASKS/explainability-module/04-structure-explainability-module.md`
 - **Counterfactual:** Approximate через **influence functions** (Koh & Liang) вместо полного recompute. Speedup 100x.
 - **Causal path:** Top-3 edges по backdoor-adjusted causal effect. Больше — шум.
 - **Hyperbolic distance:** HNSW search в Lorentz space. Brute force O(n) неприемлем.
@@ -114,14 +114,14 @@
 
 ## 6. OLAP & Analytics (ClickHouse)
 
-**[ ] 6.1. ClickHouse Schema**
+**[x] 6.1. ClickHouse Schema** ✅ Done — `TASKS/clickhouse-schema/03-design-clickhouse-schema.md`, `TASKS/clickhouse-schema/04-structure-clickhouse-schema.md`
 - **Table:** ReplacingMergeTree для deduplication raw events + AggregatingMergeTree для velocity metrics.
 - **Partitioning:** `toYYYYMM(date)`. Daily partition создаёт too many parts.
 - **Materialized views:** Pre-aggregate velocity (tx per hour, unique counterparties per day). On-the-fly слишком медленно для real-time alerts.
 - **Retention:** 90 дней hot в ClickHouse, старше — S3 через `s3()` table function.
 - **Integration с Memgraph:** Dual-write из Kafka. CDC из Memgraph не поддерживается нативно.
 
-**[ ] 6.2. Historical Aggregations & Alerting**
+**[x] 6.2. Historical Aggregations & Alerting** ✅ Done — `TASKS/historical-aggregations/03-design-historical-aggregations.md`, `TASKS/historical-aggregations/04-structure-historical-aggregations.md`
 - **Pattern matching:** SQL-based для known patterns (structuring: N txs below threshold within window), ML-based (anomaly detection на агрегациях) для unknown.
 - **Window functions:** ClickHouse window functions с `ROWS BETWEEN`. Frame clause обязателен.
 - **Alerting:** Materialized View → Kafka для real-time. Periodic batch queries для reports.
@@ -132,18 +132,18 @@
 
 ## 7. Alerting & Case Management
 
-**[ ] 7.1. Alert Generation Engine**
+**[x] 7.1. Alert Generation Engine** ✅ Done — `TASKS/alert-generation/03-design-alert-generation.md`, `TASKS/alert-generation/04-structure-alert-generation.md`
 - **Threshold:** Adaptive (per-entity baseline + deviation > 2σ). Fixed threshold даёт alert fatigue.
 - **Alert fatigue:** Correlation across alerts (same entity, same pattern → merge). Rate limiting per analyst.
 - **Priority:** P0 (BLOCK) score > 0.95, P1 (REVIEW) 0.7-0.95, P2 (MONITOR) 0.5-0.7.
 - **Escalation:** Auto-escalate P0. P1 — human review mandatory.
 
-**[ ] 7.2. Case Management**
+**[x] 7.2. Case Management** ✅ Done — `TASKS/case-management/03-design-case-management.md`, `TASKS/case-management/04-structure-case-management.md`
 - **Build vs buy:** Buy (ServiceNow/Temporal) для MVP. Custom frontend — Phase 2. AML case management — не core competency.
 - **Workflow:** Temporal для orchestration (retry, timeout, compensation). State machine слишком хрупкий.
 - **Integration:** Auto-populate case с alert JSON, causal path, counterfactual.
 
-**[ ] 7.3. SAR/STR Generation**
+**[x] 7.3. SAR/STR Generation** ✅ Done — `TASKS/sar-str-generation/03-design-sar-str-generation.md`, `TASKS/sar-str-generation/04-structure-sar-str-generation.md`
 - **Template-based:** Jinja2 templates per jurisdiction. LLM-assisted для narrative section, но human review mandatory.
 - **Validation:** Automated validation против FinCEN XML schema. Pre-filing check.
 - **Filing:** Manual export для MVP. Regulator API — Phase 2.
@@ -154,31 +154,31 @@
 
 ## 8. Infrastructure & Security
 
-**[ ] 8.1. Kubernetes Deployment**
+**[x] 8.1. Kubernetes Deployment** ✅ Done — `TASKS/k8s-deployment/03-design-k8s-deployment.md`, `TASKS/k8s-deployment/04-structure-k8s-deployment.md`
 - **K8s:** Managed (EKS/GKE). Self-managed — operational overhead.
 - **GPU:** T4/A10G для inference. CPU-only для Flink, Kafka, Memgraph.
 - **Service mesh:** Нет для MVP. Istio добавляет latency и complexity. Native K8s services + gRPC.
 - **Autoscaling:** HPA для inference (queue depth metric). VPA для stateful (Memgraph, ClickHouse).
 
-**[ ] 8.2. Monitoring**
+**[x] 8.2. Monitoring** ✅ Done — `TASKS/monitoring/03-design-monitoring.md`, `TASKS/monitoring/04-structure-monitoring.md`
 - **Metrics:** Custom для TCH-GT (inference latency, score distribution, Hawkes λ(t) percentiles). Standard для infra.
 - **Alerting:** Alertmanager для SLO (p99 > 100ms, error rate > 1%).
 - **Tracing:** OpenTelemetry. Jaeger backend.
 - **Dashboards:** Custom Grafana. Community dashboards не покрывают AML-specific metrics.
 
-**[ ] 8.3. CI/CD**
+**[x] 8.3. CI/CD** ✅ Done — `TASKS/cicd-pipeline/03-design-cicd-pipeline.md`, `TASKS/cicd-pipeline/04-structure-cicd-pipeline.md`
 - **ML pipeline:** Kubeflow Pipelines. Airflow для non-ML. Кастомные Python scripts — anti-pattern.
 - **Model registry:** MLflow. Feast не нужен (нет feature store).
 - **Deployment:** Shadow mode для новых моделей (сравнение с production на реальном traffic).
 - **Rollback:** Automated при degradation (accuracy drop > 5% или latency spike > 50%).
 
-**[ ] 8.4. Data Encryption & Key Management**
+**[x] 8.4. Data Encryption & Key Management** ✅ Done — `TASKS/data-encryption/03-design-data-encryption.md`, `TASKS/data-encryption/04-structure-data-encryption.md`
 - **Key management:** HashiCorp Vault. AWS KMS — lock-in.
 - **Data masking:** PII masking в logs. Full encryption в storage.
 - **Access control:** RBAC для MVP. ABAC — Phase 2.
 - **Audit logging:** Immutable в Iceberg.
 
-**[ ] 8.5. Regulatory Compliance**
+**[x] 8.5. Regulatory Compliance** ✅ Done — `TASKS/regulatory-compliance/03-design-regulatory-compliance.md`, `TASKS/regulatory-compliance/04-structure-regulatory-compliance.md`
 - **Travel Rule:** IVMS101 message format. Кастомный — не совместим с другими VASPs.
 - **Sanctions:** Real-time screening (OFAC, EU, UN) + integration в TCH-GT (sanctions flag as node feature).
 - **Jurisdiction rules:** Config-driven (YAML per jurisdiction).
@@ -190,18 +190,18 @@
 
 ## 9. Model Lifecycle
 
-**[ ] 9.1. Feature Store**
+**[x] 9.1. Feature Store** ✅ Done — `TASKS/feature-store/03-design-feature-store.md`, `TASKS/feature-store/04-structure-feature-store.md`
 - **Implementation:** Feast или Tecton. Feature consistency между train и serve — критична для модели.
 - **Scope:** On-chain features (tx_count, balance_history, cluster_risk_score), derived features (velocity, Hawkes λ(t)).
 - **Integration:** Dual-write из Kafka в Feature Store + Flink для real-time features.
 
-**[ ] 9.2. Model Registry**
+**[x] 9.2. Model Registry** ✅ Done — `TASKS/model-registry/03-design-model-registry.md`, `TASKS/model-registry/04-structure-model-registry.md`
 - **Tool:** MLflow. Отдельный от Feature Store, хотя MLflow может объединять оба.
 - **Versioning:** SemVer + experiment tracking. Каждая итерация модели — отдельная версия.
 - **Stage transitions:** Staging → Production → Archived. Manual approval для Production.
 - **Shadow deployment:** Новые модели параллельно с production, сравнение на реальном traffic.
 
-**[ ] 9.3. Data Quality & Drift Monitoring**
+**[x] 9.3. Data Quality & Drift Monitoring** ✅ Done — `TASKS/data-quality-drift/03-design-data-quality-drift.md`, `TASKS/data-quality-drift/04-structure-data-quality-drift.md`
 - **Tool:** Great Expectations для on-chain event validation.
 - **Data drift:** KS test для feature distributions, alert при значительном сдвиге.
 - **Concept drift:** Performance degradation monitoring (accuracy, AUC-PR decay > 5%).
@@ -213,18 +213,18 @@
 
 ## 10. Cross-cutting Concerns
 
-**[ ] 10.1. Testing (интегрирован в DoD каждого блока)**
+**[x] 10.1. Testing (интегрирован в DoD каждого блока)** ✅ Done — `TASKS/testing/03-design-testing.md`, `TASKS/testing/04-structure-testing.md`
 - **Coverage:** 80% standard, 95% ML components. Требование включено в DoD каждого блока выше.
 - **Test data:** Synthetic (Faker + graph generators) + anonymized production.
 - **Chaos engineering:** Для failure scenarios (Kafka down, Memgraph crash, GPU OOM) — интегрировано в блоки инфраструктуры и ML.
 
-**[ ] 10.2. Model Validation (интегрировано в блоки 3 и 9)**
+**[x] 10.2. Model Validation (интегрировано в блоки 3 и 9)** ✅ Done — `TASKS/model-validation/03-design-model-validation.md`, `TASKS/model-validation/04-structure-model-validation.md`
 - **Baselines:** Heuristic rules, logistic regression, GCN, GAT — benchmark в блоке Model Training.
 - **Metrics:** AUC-PR (imbalanced), calibration error, fairness — часть DoD блока 4.
 - **Statistical:** Bootstrap confidence intervals — блок Model Lifecycle.
 - **Human eval:** A/B testing analyst preference — блок Alerting & Case Management.
 
-**[ ] 10.3. Load & Performance Testing (интегрировано в блок 8)**
+**[x] 10.3. Load & Performance Testing (интегрировано в блок 8)** ✅ Done — `TASKS/load-testing/03-design-load-testing.md`, `TASKS/load-testing/04-structure-load-testing.md`
 - **Profiles:** Ramp-up, spike (10x), sustained (72h) — блок Infrastructure & Security.
 - **Metrics:** p50/p95/p99 latency, throughput, error rate — DoD каждого блока.
 - **Tools:** k6, Locust — блок Infrastructure.
@@ -251,6 +251,23 @@
 - **Feature Store** — теперь блок 9.1 (был в комментариях как отдельная необходимость).
 - **Data Quality Monitoring** — блок 9.3 (Great Expectations).
 - **Model Registry** — блок 9.2 (MLflow).
+
+---
+
+## Phase II: Design & Structure — ✅ Complete (6 parallel subagents)
+
+**Артефакты:** 20 задач × 2 файла = 40 дизайн+структурных документов
+- Subagent 1: Задачи 2.2, 2.3, 3A, 3B (Data + Model Architecture)
+- Subagent 2: Задачи 4.1, 4.2, 4.3 (Training Pipeline)
+- Subagent 3: Задачи 5A, 5B, 5C (Explainability & Inference)
+- Subagent 4: Задачи 6.1, 6.2, 7.1, 7.2, 7.3 (OLAP + Alerting)
+- Subagent 5: Задачи 8.1-8.5 (Infrastructure & Security)
+- Subagent 6: Задачи 9.1-9.3, 10.1-10.3 (Model Lifecycle + Cross-cutting)
+
+**Self-review:** Все 20 задач: 0 🔴 Critical, 0 ai-slops
+**Subagent-выводы:** 20 файлов в `artifacts/subagents/agent-*.md`
+
+**QRSPI статус:** Q→R→D→S ✅ → **P (Plan) → I (Implement) → следующий шаг: интеграция всех артефактов в единый код**
 
 ---
 

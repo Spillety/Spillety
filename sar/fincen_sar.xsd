@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Minimal FinCEN SAR XML shape (G7.4). Full BSA E-Filing XSD is authoritative;
+     this file pins the subset this repo emits. -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  <xs:element name="SAR">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="AlertID" type="xs:string"/>
+        <xs:element name="FiledAt" type="xs:string"/>
+        <xs:element name="Amount" type="xs:decimal"/>
+        <xs:element name="Asset" type="xs:string"/>
+        <xs:element name="Originator" type="xs:string"/>
+        <xs:element name="Beneficiary" type="xs:string"/>
+        <xs:element name="TxHash" type="xs:string"/>
+        <xs:element name="RiskScore" type="xs:decimal"/>
+        <xs:element name="Narrative" type="xs:string"/>
+      </xs:sequence>
+      <xs:attribute name="regime" type="xs:string" use="required" fixed="FinCEN"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

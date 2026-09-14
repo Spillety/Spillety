@@ -1,0 +1,10 @@
+Suspicious Activity Report ({{ regime }})
+====================================
+Alert ID: {{ alert_id }}
+Filed at: {{ filed_at }}
+Transaction: {{ tx_hash }} {{ amount }} {{ asset }}
+Originator: {{ originator }} -> Beneficiary: {{ beneficiary }}
+Risk score: {{ risk_score }} Decision: {{ decision }}
+Activity: {{ suspicious_activity }}
+Narrative: {{ narrative_hint }}
+References: {{ regulatory_references | join('; ') }}

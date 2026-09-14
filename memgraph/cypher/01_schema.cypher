@@ -1,47 +1,27 @@
-// 01_schema.cypher — Node & Edge table definitions for Memgraph
-// Node type: Address (blockchain address with hyperbolic embedding for scam clustering)
-CREATE NODE TABLE IF NOT EXISTS Address (
-    address STRING,
-    hyperbolic_embedding FLOAT[128],
-    cluster_id STRING,
-    PRIMARY KEY(address)
-);
+// 01_schema.cypher — temp.md graph ontology (wave C in-place rewrite).
+// Nodes: Wallet, Person, Mixer, Exchange, NewsArticle, Pattern.
+// Edges: TRANSACTS, SAME_AS, MENTIONED_IN, MATCHES_PATTERN.
+// Every edge carries valid_from / valid_to (NULL valid_to = still active).
+// Hyperbolic Poincare-ball 128D embeddings live on Wallet, Mixer, Exchange.
 
-// Node type: Entity (identified entity — exchange, wallet cluster, etc.)
-CREATE NODE TABLE IF NOT EXISTS Entity (
-    entity_name STRING,
-    risk_score FLOAT,
-    is_exchange BOOLEAN,
-    PRIMARY KEY(entity_name)
-);
+// --- Uniqueness constraints (MERGE keys used by writers in src/ingestion.py) ---
+CREATE CONSTRAINT ON (w:Wallet) ASSERT w.address IS UNIQUE;
+CREATE CONSTRAINT ON (p:Person) ASSERT p.person_id IS UNIQUE;
+CREATE CONSTRAINT ON (m:Mixer) ASSERT m.mixer_id IS UNIQUE;
+CREATE CONSTRAINT ON (e:Exchange) ASSERT e.exchange_id IS UNIQUE;
+CREATE CONSTRAINT ON (n:NewsArticle) ASSERT n.url IS UNIQUE;
+CREATE CONSTRAINT ON (p:Pattern) ASSERT p.pattern_id IS UNIQUE;
 
-// Node type: Risk (sanctions and risk classification data)
-CREATE NODE TABLE IF NOT EXISTS Risk (
-    risk_type STRING,
-    sanctions_list STRING,
-    PRIMARY KEY(risk_type)
-);
+// --- Node shapes (reference; Memgraph itself is schemaless) ---
+// (:Wallet {address, hyperbolic_embedding, cluster_id, first_seen, hawkes_lambda})
+// (:Person {person_id, kyc_status})
+// (:Mixer {mixer_id, hyperbolic_embedding, cluster_id})
+// (:Exchange {exchange_id, hyperbolic_embedding, cluster_id, jurisdiction})
+// (:NewsArticle {url, title, lang, published_at})
+// (:Pattern {pattern_id, name, description})
 
-// Edge type: TRANSFER (temporal transfer between addresses)
-CREATE EDGE TABLE IF NOT EXISTS TRANSFER (
-    amount FLOAT,
-    timestamp DATETIME,
-    valid_from DATETIME,
-    valid_to DATETIME
-);
-
-// Edge type: CO_SPEND (co-spend clustering — shared inputs heuristic)
-CREATE EDGE TABLE IF NOT EXISTS CO_SPEND (
-    shared_input_count INTEGER
-);
-
-// Edge type: MENTIONED_IN (contextual mention edge)
-CREATE EDGE TABLE IF NOT EXISTS MENTIONED_IN (
-    context STRING
-);
-
-// Edge type: SANCTIONS_FLAG (sanctions flagging edge)
-CREATE EDGE TABLE IF NOT EXISTS SANCTIONS_FLAG (
-    list STRING,
-    date DATETIME
-);
+// --- Edge shapes (all temporal; actor is Wallet, Mixer or Exchange) ---
+// (actor)-[:TRANSACTS {tx_hash, amount, asset, timestamp, valid_from, valid_to}]->(actor)
+// (:Wallet)-[:SAME_AS {evidence, valid_from, valid_to}]->(:Person)
+// (:Wallet)-[:MENTIONED_IN {snippet, valid_from, valid_to}]->(:NewsArticle)
+// (:Wallet)-[:MATCHES_PATTERN {score, valid_from, valid_to}]->(:Pattern)

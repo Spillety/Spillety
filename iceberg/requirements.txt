@@ -1,0 +1,7 @@
+# Iceberg audit trail deps (G6.2). pyarrow is the local-parquet fallback
+# engine; pyiceberg enables the live catalog commit path in writer.py.
+# NOTE: offline install is impossible (no network); without pyiceberg the
+# writer keeps working via the local parquet fallback.
+pyarrow>=10.0
+pyiceberg>=0.6
+pyyaml>=6.0

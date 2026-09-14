@@ -19,11 +19,4 @@ public class EdgeEvent {
     public void setTarget(String target) { this.target = target; }
     public long getTimestamp() { return timestamp; }
     public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
-
-    public static EdgeEvent fromJson(String json) {
-        String[] parts = json.replace("{", "").replace("}", "").split(",");
-        String source = parts[0].split(":")[1].trim().replace("\"", "");
-        String target = parts[1].split(":")[1].trim().replace("\"", "");
-        return new EdgeEvent(source, target, System.currentTimeMillis());
-    }
 }

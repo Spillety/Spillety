@@ -1,3 +1,10 @@
+from itertools import pairwise
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from entity_resolution.src.exchange_filter import ExchangeFilter
+
+
 class UnionFind:
     def __init__(self) -> None:
         self.parent: dict[str, str] = {}
@@ -45,3 +52,41 @@ def process_co_spend(
     for addr in input_addresses[1:]:
         root = uf.union(root, addr)
     return root
+
+
+def process_timing(
+    uf: UnionFind,
+    events: list[tuple[str, float]],
+    window_sec: float,
+    exchange_filter: "ExchangeFilter | None" = None,
+) -> list[str]:
+    # ponytail: unions only time-adjacent pairs; transitivity via UnionFind chains the full window cluster
+    if exchange_filter is not None:
+        events = [e for e in events if not exchange_filter.is_exchange(e[0])]
+    ordered = sorted(events, key=lambda e: e[1])
+    roots: list[str] = []
+    for (prev_addr, prev_ts), (addr, ts) in pairwise(ordered):
+        if ts - prev_ts <= window_sec:
+            roots.append(uf.union(prev_addr, addr))
+    return roots
+
+
+def process_fee_pattern(
+    uf: UnionFind,
+    address_fees: dict[str, float],
+    tolerance: float,
+    exchange_filter: "ExchangeFilter | None" = None,
+) -> list[str]:
+    # ponytail: relative tolerance against the lower fee; adjacent-pair unioning relies on UnionFind transitivity
+    if exchange_filter is not None:
+        address_fees = {
+            a: f for a, f in address_fees.items()
+            if not exchange_filter.is_exchange(a)
+        }
+    ordered = sorted(address_fees.items(), key=lambda kv: kv[1])
+    roots: list[str] = []
+    for (prev_addr, prev_fee), (addr, fee) in pairwise(ordered):
+        base = prev_fee if prev_fee > 0 else fee
+        if base > 0 and abs(fee - prev_fee) / base <= tolerance or base == 0 and fee == 0:
+            roots.append(uf.union(prev_addr, addr))
+    return roots

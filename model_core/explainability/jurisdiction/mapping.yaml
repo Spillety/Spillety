@@ -1,0 +1,37 @@
+US:
+  - "FinCEN (US)"
+  - "FATF Recommendation 16 (Travel Rule)"
+EU:
+  - "AMLD5 (EU)"
+  - "EU AMLD6 Article 3(1)"
+  - "FATF Recommendation 16 (Travel Rule)"
+UK:
+  - "MLR 2017 (UK)"
+  - "FATF Recommendation 16 (Travel Rule)"
+SG:
+  - "MAS TSA (SG)"
+  - "FATF Recommendation 16 (Travel Rule)"
+JP:
+  - "PSA (JP)"
+  - "FATF Recommendation 16 (Travel Rule)"
+AU:
+  - "AML/CTF Act (AU)"
+  - "FATF Recommendation 16 (Travel Rule)"
+CA:
+  - "PCMLTFA (CA)"
+  - "FATF Recommendation 16 (Travel Rule)"
+CH:
+  - "AMLA-FINMA (CH)"
+  - "FATF Recommendation 16 (Travel Rule)"
+BR:
+  - "COAF (BR)"
+  - "FATF Recommendation 16 (Travel Rule)"
+KR:
+  - "FTR (KR)"
+  - "FATF Recommendation 16 (Travel Rule)"
+IN:
+  - "PMLA (IN)"
+  - "FATF Recommendation 16 (Travel Rule)"
+AE:
+  - "AML-CTF (AE)"
+  - "FATF Recommendation 16 (Travel Rule)"

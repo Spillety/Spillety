@@ -6,6 +6,10 @@ thresholds:
   over_merging:
     cluster_size_max: 1000
 
+  heuristics:
+    timing_window_sec: 3600
+    fee_tolerance: 0.05
+
   human_in_the_loop:
     confidence_threshold: 0.7
 

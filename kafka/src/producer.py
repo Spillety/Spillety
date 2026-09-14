@@ -2,14 +2,20 @@
 EventProducer: serializes OnChainEvent to Protobuf and produces to Kafka.
 """
 
-from confluent_kafka import Producer, KafkaError
-import events_pb2
 import schema_registry
+from confluent_kafka import KafkaError, Producer
+from google.protobuf.message import Message
+
+# Canonical ingest topics, mirrors kafka/config/topics.yaml.
+TOPIC_RAW_EVENTS = "raw-events"
+TOPIC_NEWS_EVENTS = "news-events"
+TOPIC_KYC_UPDATES = "kyc-updates"
+TOPIC_AVM_SCREENING = "avm-screening"
 
 
 class EventProducer:
     """
-    Kafka producer with Protobuf serialization and DLQ routing on failure.
+    Kafka producer with Protobuf serialization.
     """
 
     def __init__(self, bootstrap_servers: str, schema_registry_url: str):
@@ -23,48 +29,21 @@ class EventProducer:
             "compression.type": "lz4",
         })
         self._schema_registry_url = schema_registry_url
-        self._dlq_topic = "dead-letter-events"
 
-    def produce(self, topic: str, event: event_pb2.OnChainEvent, partition_key: str) -> bool:
+    def produce(self, topic: str, event: Message, partition_key: str) -> bool:
         """
-        Serialize event to Protobuf bytes and produce to Kafka topic.
+        Serialize a Protobuf event and produce to Kafka topic.
 
-        On serialization failure, routes to DLQ instead of dropping.
-        
+        Serialization errors propagate to the caller.
         """
-        try:
-            payload = event.SerializeToString()
-            key = partition_key.encode("utf-8")
-            self._producer.produce(
-                topic=topic, key=key, value=payload,
-                on_commit=self._delivery_callback,
-            )
-            self._producer.poll(0)
-            return True
-        except Exception as e:
-            self._send_to_dlq(topic, partition_key, e)
-            return False
-
-    def _send_to_dlq(self, source_topic: str, partition: int, error_message: str) -> None:
-        """
-        Send failed message metadata to dead-letter-events topic.
-        """
-        import base64, json, time
-        dlq_msg = {
-            "original_payload": "",
-            "error_code": "SERIALIZATION_ERROR",
-            "error_message": str(error_message),
-            "topic": source_topic,
-            "partition": partition,
-            "offset": -1,
-            "timestamp": int(time.time() * 1000),
-        }
+        payload = event.SerializeToString()
+        key = partition_key.encode("utf-8")
         self._producer.produce(
-            topic=self._dlq_topic,
-            key=source_topic.encode("utf-8"),
-            value=json.dumps(dlq_msg).encode("utf-8"),
+            topic=topic, key=key, value=payload,
+            on_commit=self._delivery_callback,
         )
         self._producer.poll(0)
+        return True
 
     def _delivery_callback(self, err, msg) -> None:
         """

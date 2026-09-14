@@ -1,107 +1,126 @@
-import json
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any
 
 from memgraph import Memgraph
 
 
 @dataclass
 class QueryResult:
-    columns: List[str]
-    rows: List[Dict[str, Any]]
+    columns: list[str]
+    rows: list[dict[str, Any]]
 
 
 class MemgraphQueryService:
     """
-    Python query service for Memgraph graph database.
+    Python query service for temp.md ontology in Memgraph.
     """
 
     def __init__(self, host: str = "localhost", port: int = 7687) -> None:
         self._mg = Memgraph(host=host, port=port)
 
-    def lookup_address(self, address: str) -> QueryResult:
+    def lookup_wallet(self, address: str) -> QueryResult:
         """
-        Look up an address by hash index (O(1) lookup).
+        Look up a wallet by point-lookup index (O(1) lookup).
         """
         result = self._mg.execute(
-            "MATCH (a:Address {address: $addr}) RETURN a",
+            "MATCH (w:Wallet {address: $addr}) RETURN w",
             params={"addr": address},
         )
         return self._to_result(result)
 
-    def traverse_transfers(
-        self, address: str, depth: int = 3, limit: int = 100
+    def traverse_transacts(
+        self, address: str, depth: int = 2, limit: int = 100
     ) -> QueryResult:
         """
-        BFS traversal via TRANSFER edges from an address.
+        Local subgraph via TRANSACTS from a wallet (lazy inference input).
         """
         result = self._mg.execute(
-            "MATCH (a:Address {address: $addr})-[:TRANSFER*1..$depth]->(b:Address) "
-            "RETURN b.address AS address, b.cluster_id AS cluster_id "
-            "LIMIT $limit",
+            "MATCH (w:Wallet {address: $addr})-[:TRANSACTS*1..$depth]-(n) "
+            "RETURN labels(n) AS labels, n.address AS address, "
+            "n.cluster_id AS cluster_id LIMIT $limit",
             params={"addr": address, "depth": depth, "limit": limit},
         )
         return self._to_result(result)
 
-    def temporal_query(
+    def temporal_transacts(
         self, start_date: str, end_date: str, limit: int = 1000
     ) -> QueryResult:
         """
-        Find active transfers within a temporal window.
+        Find active TRANSACTS within a temporal window.
         """
         result = self._mg.execute(
-            "MATCH (a:Address)-[t:TRANSFER]->(b:Address) "
+            "MATCH (a)-[t:TRANSACTS]->(b) "
             "WHERE t.valid_from <= datetime($end) "
             "AND (t.valid_to IS NULL OR t.valid_to >= datetime($start)) "
             "RETURN a.address AS from_addr, b.address AS to_addr, "
-            "t.amount AS amount, t.timestamp AS timestamp "
+            "t.tx_hash AS tx_hash, t.amount AS amount, t.timestamp AS timestamp "
             "ORDER BY t.timestamp DESC LIMIT $limit",
             params={"start": start_date, "end": end_date, "limit": limit},
         )
         return self._to_result(result)
 
-    def vector_search(
-        self, query_vector: List[float], limit: int = 10
+    def nearest_scam_cluster(
+        self, query_vector: list[float], limit: int = 10
     ) -> QueryResult:
         """
-        Nearest neighbor search via HNSW vector index.
+        Nearest neighbor search over HNSW vector indexes on Wallet/Mixer/Exchange
+        hyperbolic embeddings; feeds explanation.hyperbolic_distance.
         """
         result = self._mg.execute(
-            "MATCH (a:Address) WHERE a.hyperbolic_embedding IS NOT NULL "
-            "RETURN a.address AS address, a.cluster_id AS cluster_id "
-            "ORDER BY a.hyperbolic_embedding <-> $vector LIMIT $limit",
+            "MATCH (w:Wallet) WHERE w.hyperbolic_embedding IS NOT NULL "
+            "RETURN w.address AS node_id, 'Wallet' AS kind, "
+            "w.hyperbolic_embedding <-> $vector AS distance "
+            "UNION ALL "
+            "MATCH (m:Mixer) WHERE m.hyperbolic_embedding IS NOT NULL "
+            "RETURN m.mixer_id AS node_id, 'Mixer' AS kind, "
+            "m.hyperbolic_embedding <-> $vector AS distance "
+            "UNION ALL "
+            "MATCH (e:Exchange) WHERE e.hyperbolic_embedding IS NOT NULL "
+            "RETURN e.exchange_id AS node_id, 'Exchange' AS kind, "
+            "e.hyperbolic_embedding <-> $vector AS distance "
+            "ORDER BY distance LIMIT $limit",
             params={"vector": query_vector, "limit": limit},
         )
         return self._to_result(result)
 
-    def co_spend_clustering(
-        self, min_shared: int = 1, limit: int = 50
-    ) -> QueryResult:
+    def wallets_of_person(self, person_id: str, limit: int = 50) -> QueryResult:
         """
-        Find co-spending relationships via CO_SPEND edges.
+        Find wallets linked to a person via SAME_AS edges.
         """
         result = self._mg.execute(
-            "MATCH (a:Address)-[c:CO_SPEND]->(b:Address) "
-            "WHERE c.shared_input_count >= $min_shared "
-            "RETURN a.address AS addr_a, b.address AS addr_b, "
-            "c.shared_input_count AS shared_input_count "
-            "ORDER BY shared_input_count DESC LIMIT $limit",
-            params={"min_shared": min_shared, "limit": limit},
+            "MATCH (w:Wallet)-[s:SAME_AS]->(p:Person {person_id: $pid}) "
+            "RETURN w.address AS address, s.evidence AS evidence, "
+            "s.valid_from AS valid_from LIMIT $limit",
+            params={"pid": person_id, "limit": limit},
         )
         return self._to_result(result)
 
-    def sanctions_query(
-        self, sanctions_list: str, limit: int = 100
-    ) -> QueryResult:
+    def mentions_of_wallet(self, address: str, limit: int = 100) -> QueryResult:
         """
-        Find addresses flagged by a sanctions list.
+        Find news articles mentioning a wallet via MENTIONED_IN edges.
         """
         result = self._mg.execute(
-            "MATCH (a:Address)-[s:SANCTIONS_FLAG]->(r:Risk) "
-            "WHERE s.list = $list "
-            "RETURN a.address AS address, r.risk_type AS risk_type, s.date AS date "
-            "ORDER BY s.date DESC LIMIT $limit",
-            params={"list": sanctions_list, "limit": limit},
+            "MATCH (w:Wallet {address: $addr})-[m:MENTIONED_IN]->(n:NewsArticle) "
+            "RETURN n.url AS url, n.title AS title, m.snippet AS snippet, "
+            "m.valid_from AS valid_from "
+            "ORDER BY m.valid_from DESC LIMIT $limit",
+            params={"addr": address, "limit": limit},
+        )
+        return self._to_result(result)
+
+    def pattern_matches(
+        self, min_score: float = 0.5, limit: int = 50
+    ) -> QueryResult:
+        """
+        Find wallets matching risk patterns above score threshold.
+        """
+        result = self._mg.execute(
+            "MATCH (w:Wallet)-[m:MATCHES_PATTERN]->(p:Pattern) "
+            "WHERE m.score >= $min_score "
+            "RETURN w.address AS address, p.pattern_id AS pattern_id, "
+            "m.score AS score "
+            "ORDER BY score DESC LIMIT $limit",
+            params={"min_score": min_score, "limit": limit},
         )
         return self._to_result(result)
 
@@ -117,20 +136,3 @@ class MemgraphQueryService:
             columns=[col.name for col in result.columns],
             rows=[dict(row.items()) for row in result],
         )
-
-
-def demo() -> None:
-    """
-    Smoke test: instantiate service and run a lookup.
-    """
-    svc = MemgraphQueryService()
-    try:
-        r = svc.lookup_address("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb")
-        assert isinstance(r, QueryResult)
-        print(f"Columns: {r.columns}, Rows: {len(r.rows)}")
-    finally:
-        svc.close()
-
-
-if __name__ == "__main__":
-    demo()

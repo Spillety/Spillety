@@ -1,0 +1,170 @@
+{
+  "$id": "https://k-brain.org/schemas/aml-alert-v2.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "alert_id": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "decision": {
+      "type": "string"
+    },
+    "explanation": {
+      "additionalProperties": true,
+      "properties": {
+        "causal_path": {
+          "items": {
+            "additionalProperties": true,
+            "properties": {
+              "causal_effect": {
+                "type": "number"
+              },
+              "edge": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "edge",
+              "causal_effect"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "counterfactual": {
+          "additionalProperties": true,
+          "properties": {
+            "delta": {
+              "type": "number"
+            },
+            "interpretation": {
+              "type": "string"
+            },
+            "removed_edge": {
+              "type": "string"
+            },
+            "score_without_edge": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "removed_edge",
+            "score_without_edge",
+            "delta",
+            "interpretation"
+          ],
+          "type": "object"
+        },
+        "hawkes_intensity": {
+          "additionalProperties": true,
+          "properties": {
+            "lambda_t": {
+              "minimum": 0,
+              "type": "number"
+            },
+            "threshold": {
+              "type": "number"
+            },
+            "trigger": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "lambda_t",
+            "threshold",
+            "trigger"
+          ],
+          "type": "object"
+        },
+        "hyperbolic_distance": {
+          "additionalProperties": true,
+          "properties": {
+            "distance": {
+              "minimum": 0,
+              "type": "number"
+            },
+            "nearest_scam_cluster": {
+              "type": "string"
+            },
+            "percentile": {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "nearest_scam_cluster",
+            "distance",
+            "percentile"
+          ],
+          "type": "object"
+        },
+        "regulatory_references": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "counterfactual",
+        "causal_path",
+        "hyperbolic_distance",
+        "hawkes_intensity",
+        "regulatory_references"
+      ],
+      "type": "object"
+    },
+    "risk_score": {
+      "maximum": 1,
+      "minimum": 0,
+      "type": "number"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "transaction": {
+      "additionalProperties": true,
+      "properties": {
+        "amount": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "asset": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "tx_hash": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tx_hash",
+        "from",
+        "to",
+        "amount",
+        "asset"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "alert_id",
+    "timestamp",
+    "transaction",
+    "risk_score",
+    "decision",
+    "explanation"
+  ],
+  "title": "AMLAlertV2",
+  "type": "object"
+}

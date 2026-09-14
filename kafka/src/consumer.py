@@ -1,10 +1,36 @@
-from confluent_kafka import Consumer, Producer, KafkaError
-from prometheus_client import Counter, Gauge
-import events_pb2
+import logging
 import time
+
+import events_pb2
+from confluent_kafka import Consumer, KafkaError, Producer
+from prometheus_client import Counter, Gauge
+
+logger = logging.getLogger(__name__)
+
+try:
+    import enrichment_pb2
+except ImportError:  # generated stubs absent until compile_proto.sh runs
+    enrichment_pb2 = None
 
 DLQ_TOTAL = Counter("kafka_dlq_total", "Total dead-letter messages", ["topic", "error_code"])
 DLQ_RATE = Gauge("kafka_dlq_rate", "Current DLQ rate", ["topic"])
+
+# Topic -> Protobuf message class for value deserialization.
+TOPIC_PARSERS: dict = {"raw-events": events_pb2.OnChainEvent}
+if enrichment_pb2 is not None:
+    TOPIC_PARSERS.update({
+        "news-events": enrichment_pb2.NewsArticleEvent,
+        "kyc-updates": enrichment_pb2.KycUpdate,
+        "avm-screening": enrichment_pb2.AvmScreening,
+    })
+
+
+def parse_message(topic: str, payload: bytes):
+    """Deserialize payload with the Protobuf class registered for topic."""
+    cls = TOPIC_PARSERS.get(topic, events_pb2.OnChainEvent)
+    event = cls()
+    event.ParseFromString(payload)
+    return event
 
 
 class EventConsumer:
@@ -48,11 +74,10 @@ class EventConsumer:
 
             self._total_count += 1
             try:
-                event = event_pb2.OnChainEvent()
-                event.ParseFromString(msg.value())
+                event = parse_message(msg.topic(), msg.value())
                 process_callback(event=event, topic=msg.topic(), partition=msg.partition(), offset=msg.offset())
                 self._consumer.commit(msg)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - all processing failures route to DLQ by design
                 self._dlq_count += 1
                 self._handle_dlq(msg, str(e))
 
@@ -63,7 +88,8 @@ class EventConsumer:
         """
         Send failed message to dead-letter-events topic and check circuit breaker.
         """
-        import base64, json
+        import base64
+        import json
         dlq_msg = {
             "original_payload": base64.b64encode(msg.value()).decode("utf-8"),
             "error_code": "DESERIALIZATION_ERROR",
@@ -83,7 +109,7 @@ class EventConsumer:
         self._check_circuit_breaker()
 
     def _handle_error(self, msg) -> None:
-        pass  # Non-deserialization errors: not currently actionable
+        logger.warning("Kafka error without DLQ routing: %s", msg.error())
 
     def _check_dlq_rate(self) -> None:
         """

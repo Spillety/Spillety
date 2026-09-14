@@ -1,0 +1,41 @@
+# Canonical Kafka topic catalog for streaming ingest (temp.md: DATA INGESTION).
+# No external connectors — plain topics, Protobuf values, DLQ on failure.
+topics:
+  raw-events:
+    description: "On-chain transfer events (kafka.onchain.v1.OnChainEvent)"
+    partitions: 12
+    key: "from_address"
+  news-events:
+    description: "News feed items (kafka.enrichment.v1.NewsArticleEvent)"
+    partitions: 6
+    key: "article_url"
+  kyc-updates:
+    description: "KYC profile changes (kafka.enrichment.v1.KycUpdate)"
+    partitions: 6
+    key: "person_id"
+  avm-screening:
+    description: "AVM screening verdicts (kafka.enrichment.v1.AvmScreening)"
+    partitions: 6
+    key: "address"
+  dead-letter-events:
+    description: "Serialization/deserialization failures from all ingest topics"
+    partitions: 3
+    key: "source_topic"
+  alerts_raw:
+    description: "All scored alerts (alerting scorer output, JSON)"
+    partitions: 6
+    key: "to_address"
+  alerts_merged:
+    description: "Dedup-merged alerts, same entity+pattern collapsed (JSON)"
+    partitions: 6
+    key: "to_address"
+  alerts_p0:
+    description: "P0/BLOCK alerts only, score > 0.95 (JSON)"
+    partitions: 6
+    key: "to_address"
+
+defaults:
+  replication_factor: 3
+  min_insync_replicas: 2
+  compression_type: "lz4"
+  retention_hours: 2160

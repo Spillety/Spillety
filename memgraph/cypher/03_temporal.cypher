@@ -1,39 +1,41 @@
-// 03_temporal.cypher — Temporal edge property setup and sample temporal queries
-// Temporal edges are implemented as properties (valid_from, valid_to) on the edge,
-// not as separate edge types — avoids schema explosion per design decision.
+// 03_temporal.cypher — temporal edge writes and point-in-time queries.
+// Every edge type carries valid_from / valid_to; NULL valid_to = still active.
 
-// Create a temporal TRANSFER edge with validity window
-// MATCH (a:Address {address: $from}), (b:Address {address: $to})
-// CREATE (a)-[:TRANSFER {amount: $amount, timestamp: datetime(), valid_from: datetime(), valid_to: NULL}]->(b);
+// Create a TRANSACTS edge with validity window
+// MATCH (a:Wallet {address: $from}), (b:Wallet {address: $to})
+// CREATE (a)-[:TRANSACTS {tx_hash: $tx_hash, amount: $amount, asset: $asset, timestamp: datetime($ts), valid_from: datetime($valid_from), valid_to: NULL}]->(b);
 
-// Create a CO_SPEND edge with temporal context
-// MATCH (a:Address {address: $a}), (b:Address {address: $b})
-// CREATE (a)-[:CO_SPEND {shared_input_count: $count, valid_from: datetime(), valid_to: NULL}]->(b);
+// Create a SAME_AS edge (KYC wallet linkage) with validity window
+// MATCH (w:Wallet {address: $addr}), (p:Person {person_id: $person_id})
+// CREATE (w)-[:SAME_AS {evidence: $evidence, valid_from: datetime($valid_from), valid_to: NULL}]->(p);
 
-// Create a SANCTIONS_FLAG edge with temporal validity
-// MATCH (a:Address {address: $addr}), (r:Risk {risk_type: $type})
-// CREATE (a)-[:SANCTIONS_FLAG {list: $list, date: datetime(), valid_from: datetime(), valid_to: NULL}]->(r);
+// Create a MENTIONED_IN edge (news mention) with validity window
+// MATCH (w:Wallet {address: $addr}), (n:NewsArticle {url: $url})
+// CREATE (w)-[:MENTIONED_IN {snippet: $snippet, valid_from: datetime($valid_from), valid_to: NULL}]->(n);
 
-// Query: All active transfers at a point in time
-// Returns transfers where valid_from <= now AND (valid_to IS NULL OR valid_to >= now)
-MATCH (a:Address)-[t:TRANSFER]->(b:Address)
+// Create a MATCHES_PATTERN edge (screening hit) with validity window
+// MATCH (w:Wallet {address: $addr}), (p:Pattern {pattern_id: $pattern_id})
+// CREATE (w)-[:MATCHES_PATTERN {score: $score, valid_from: datetime($valid_from), valid_to: NULL}]->(p);
+
+// Query: all active TRANSACTS at a point in time
+MATCH (a)-[t:TRANSACTS]->(b)
 WHERE t.valid_from <= datetime('2026-09-12T00:00:00')
   AND (t.valid_to IS NULL OR t.valid_to >= datetime('2026-09-12T00:00:00'))
-RETURN a.address, b.address, t.amount, t.timestamp, t.valid_from, t.valid_to
+RETURN a.address, b.address, t.tx_hash, t.amount, t.valid_from, t.valid_to
 ORDER BY t.timestamp DESC
 LIMIT 1000;
 
-// Query: Transfer history for an address within a date range
-MATCH (a:Address)-[t:TRANSFER]->(b:Address)
+// Query: TRANSACTS history for a wallet within a date range
+MATCH (a:Wallet)-[t:TRANSACTS]->(b)
 WHERE a.address = $address
   AND t.valid_from >= datetime($start_date)
-  AND t.valid_to <= datetime($end_date)
-RETURN b.address, t.amount, t.timestamp
+  AND (t.valid_to IS NULL OR t.valid_to <= datetime($end_date))
+RETURN b.address, t.tx_hash, t.amount, t.timestamp
 ORDER BY t.timestamp DESC
 LIMIT 500;
 
-// Query: Expire transfers by setting valid_to
-// MATCH (a:Address)-[t:TRANSFER]->(b:Address)
-// WHERE t.valid_to IS NULL AND t.timestamp < datetime($cutoff)
-// SET t.valid_to = datetime($cutoff)
+// Query: expire stale edges by setting valid_to
+// MATCH ()-[e:TRANSACTS]->()
+// WHERE e.valid_to IS NULL AND e.timestamp < datetime($cutoff)
+// SET e.valid_to = datetime($cutoff)
 // RETURN count(*);

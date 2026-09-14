@@ -8,7 +8,7 @@ public class CheckpointConfig {
     static final long MIN_PAUSE_BETWEEN_CHECKPOINTS_MS = 30_000L;
     static final long CHECKPOINT_TIMEOUT_MS = 300_000L;
 
-    static void configure(StreamExecutionEnvironment env) {
+    public static void configure(StreamExecutionEnvironment env) {
         env.enableCheckpointing(CHECKPOINT_INTERVAL_MS,
             org.apache.flink.streaming.api.environment.CheckpointConfig.CheckpointingMode.EXACTLY_ONCE);
         env.setMinPauseBetweenCheckpoints(MIN_PAUSE_BETWEEN_CHECKPOINTS_MS);

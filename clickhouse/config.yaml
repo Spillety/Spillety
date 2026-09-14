@@ -1,0 +1,12 @@
+# OLAP thresholds and windows (temp.md: velocity checks, historical aggregations).
+# Magic numbers live here, not in SQL. # ponytail: structuring values are
+# initial guesses, upgrade path is calibration on historical alerts.
+velocity:
+  windows: ["1h", "24h", "7d"]
+
+structuring:
+  amount_threshold: 10000.0
+  min_tx_count: 10
+  window_hours: 24
+
+retention_days: 90

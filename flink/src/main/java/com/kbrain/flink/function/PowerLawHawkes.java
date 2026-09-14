@@ -1,34 +1,52 @@
 package com.kbrain.flink.function;
 
-import org.apache.flink.api.common.state.MapState;
-import org.apache.flink.api.common.state.MapStateDescriptor;
+import org.apache.flink.api.common.state.StateTtlConfig;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
+import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
-import com.kbrain.flink.function.PowerLawKernel;
 import com.kbrain.flink.model.OnChainEvent;
 import com.kbrain.flink.model.HawkesUpdate;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public class PowerLawHawkes extends KeyedProcessFunction<String, OnChainEvent, HawkesUpdate> {
 
-    private transient MapState<String, OnChainEvent> eventLogState;
     private transient ValueState<Double> intensityState;
+    private transient ValueState<Long> lastTimeState;
+    private transient ValueState<Long> countState;
+    private transient ValueState<PowerLawKernel.HawkesParams> paramsState;
+
+    private static StateTtlConfig hawkesTtl() {
+        return StateTtlConfig.newBuilder(Time.days(PowerLawKernel.TTL_DAYS))
+            .setUpdateType(StateTtlConfig.UpdateType.OnCreateAndWrite)
+            .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
+            .build();
+    }
 
     @Override
     public void open(Configuration parameters) {
-        MapStateDescriptor<String, OnChainEvent> eventLogDescriptor =
-            new MapStateDescriptor<>("event-log", Types.STRING, OnChainEvent.class);
-        eventLogState = getRuntimeContext().getMapState(eventLogDescriptor);
-
         ValueStateDescriptor<Double> intensityDescriptor =
             new ValueStateDescriptor<>("hawkes-intensity", Types.DOUBLE);
+        intensityDescriptor.enableTimeToLive(hawkesTtl());
         intensityState = getRuntimeContext().getValueState(intensityDescriptor);
+
+        ValueStateDescriptor<Long> lastTimeDescriptor =
+            new ValueStateDescriptor<>("hawkes-last-time", Types.LONG);
+        lastTimeDescriptor.enableTimeToLive(hawkesTtl());
+        lastTimeState = getRuntimeContext().getValueState(lastTimeDescriptor);
+
+        ValueStateDescriptor<Long> countDescriptor =
+            new ValueStateDescriptor<>("hawkes-count", Types.LONG);
+        countDescriptor.enableTimeToLive(hawkesTtl());
+        countState = getRuntimeContext().getValueState(countDescriptor);
+
+        ValueStateDescriptor<PowerLawKernel.HawkesParams> paramsDescriptor =
+            new ValueStateDescriptor<>(
+                "hawkes-params", Types.POJO(PowerLawKernel.HawkesParams.class));
+        paramsDescriptor.enableTimeToLive(hawkesTtl());
+        paramsState = getRuntimeContext().getValueState(paramsDescriptor);
     }
 
     @Override
@@ -37,20 +55,33 @@ public class PowerLawHawkes extends KeyedProcessFunction<String, OnChainEvent, H
             Context ctx,
             Collector<HawkesUpdate> out) throws Exception {
 
-        if (eventLogState.get(event.getEventId()) != null) {
-            return;
+        PowerLawKernel.HawkesParams params = paramsState.value();
+        if (params == null) {
+            params = new PowerLawKernel.HawkesParams();
+            paramsState.update(params);
         }
 
-        eventLogState.put(event.getEventId(), event);
-
-        List<Double> timestamps = new ArrayList<>();
-        for (String key : eventLogState.keys()) {
-            timestamps.add(eventLogState.get(key).getTimestamp());
+        Double prevLambda = intensityState.value();
+        Long prevTime = lastTimeState.value();
+        Long count = countState.value();
+        if (count == null) {
+            count = 0L;
         }
 
-        double newIntensity = PowerLawKernel.computeIntensity(
-            System.currentTimeMillis(), timestamps);
+        // Event-time from the payload; wall-clock is never substituted (wave A2).
+        long eventTime = event.getTimestamp();
+        double base = (prevLambda == null) ? params.getMu() : prevLambda;
+        long baseTime = (prevTime == null) ? -1L : prevTime;
+
+        // Out-of-order events skip decay so intensity stays monotone within the key.
+        double newIntensity =
+            PowerLawKernel.updateIncremental(base, baseTime, eventTime, params);
+
         intensityState.update(newIntensity);
-        out.collect(new HawkesUpdate(event.getAddress(), newIntensity));
+        if (prevTime == null || eventTime > prevTime) {
+            lastTimeState.update(eventTime);
+        }
+        countState.update(count + 1);
+        out.collect(new HawkesUpdate(event.getToAddress(), newIntensity));
     }
 }

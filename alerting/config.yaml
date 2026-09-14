@@ -1,0 +1,24 @@
+# Alert layer thresholds (K-BRAIN/TODO.md G7.2, wave D).
+# Maps orchestrator risk_score (temp.md JSON) to priority/action.
+priorities:
+  p0:
+    min_score: 0.95
+    action: "BLOCK"
+  p1:
+    min_score: 0.7
+    action: "REVIEW"
+  p2:
+    min_score: 0.5
+    action: "MONITOR"
+
+# Dedup/merge: alerts with the same entity+pattern collapse into one.
+dedup:
+  entity_side: "to"
+  pattern_field: "nearest_scam_cluster"
+  window_hours: 24
+  rate_limit_per_entity_per_hour: 10
+
+topics:
+  raw: "alerts_raw"
+  merged: "alerts_merged"
+  p0: "alerts_p0"

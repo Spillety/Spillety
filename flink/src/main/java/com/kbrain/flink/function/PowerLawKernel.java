@@ -1,42 +1,55 @@
 package com.kbrain.flink.function;
 
-import java.util.List;
+import java.io.Serializable;
 
 public class PowerLawKernel {
 
-    static final double ALPHA = 0.5;
-    static final double BETA = 0.3;
-    static final double MU = 0.01;
+    public static final double DEFAULT_ALPHA = 0.5;
+    public static final double DEFAULT_BETA = 0.3;
+    public static final double DEFAULT_MU = 0.01;
+    public static final long TTL_DAYS = 14L;
 
-    /**
-     * Compute λ(t) via numerical integration of power-law kernel.
-     * Integration uses trapezoidal rule over event timestamps.
-     * Complexity: O(n) per event where n = event log size.
-     * # ponytail: O(1) approximate updater, add when numerical integration exceeds 5ms latency.
-     */
-static double computeIntensity(double currentTime, List<Double> eventTimestamps) {
-        double intensity = MU;
-        for (double t_i : eventTimestamps) {
-            double dt = currentTime - t_i;
-            if (dt > 0) {
-                intensity += ALPHA * Math.pow(dt, -BETA);
-            }
+    public static class HawkesParams implements Serializable {
+        private double alpha = DEFAULT_ALPHA;
+        private double beta = DEFAULT_BETA;
+        private double mu = DEFAULT_MU;
+
+        public HawkesParams() {}
+
+        public HawkesParams(double alpha, double beta, double mu) {
+            this.alpha = alpha;
+            this.beta = beta;
+            this.mu = mu;
         }
-        return intensity;
+
+        public double getAlpha() { return alpha; }
+        public void setAlpha(double alpha) { this.alpha = alpha; }
+        public double getBeta() { return beta; }
+        public void setBeta(double beta) { this.beta = beta; }
+        public double getMu() { return mu; }
+        public void setMu(double mu) { this.mu = mu; }
     }
 
-    static double integratePowerLaw(double t, double alpha, double beta) {
-        if (t <= 0) return 0.0;
-        int steps = 1000;
-        double h = t / steps;
-        double sum = 0.5 * kernel(0, alpha, beta) + 0.5 * kernel(t, alpha, beta);
-        for (int i = 1; i < steps; i++) {
-            sum += kernel(i * h, alpha, beta);
+    // O(1) recursive update: decay aggregate past excitation, then add fresh event mass.
+    // Power-law aggregate has no exact Markov factorization, so the decay uses a
+    // heavy-tail factor (1 + dtSec)^-beta that preserves long memory better than exp().
+    // # ponytail: exact power-law sum needs full history; this aggregate is an approximation.
+    public static double updateIncremental(
+            double prevLambda, long prevTimeMs, long currentTimeMs, HawkesParams params) {
+        double mu = params.getMu();
+        if (prevTimeMs < 0) {
+            return mu + params.getAlpha();
         }
-        return sum * h;
-    }
-
-    static double kernel(double dt, double alpha, double beta) {
-        return alpha * Math.pow(dt, -beta);
+        long dtMs = currentTimeMs - prevTimeMs;
+        if (dtMs <= 0) {
+            return prevLambda + params.getAlpha();
+        }
+        double dtSec = dtMs / 1000.0;
+        double decay = Math.pow(1.0 + dtSec, -params.getBeta());
+        double survived = (prevLambda - mu) * decay;
+        if (survived < 0) {
+            survived = 0;
+        }
+        return mu + survived + params.getAlpha();
     }
 }

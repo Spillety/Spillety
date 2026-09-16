@@ -1,25 +1,37 @@
 #!/usr/bin/env python3
 """Regenerate Links block in SKILL.md from actual repo files."""
 from pathlib import Path
+
 SKILL = Path(".agents/skills/spillety/SKILL.md")
 START = "<!-- AUTO-GEN:START -->"
 END = "<!-- AUTO-GEN:END -->"
-PATTERNS = ["docs/**/*.md", "spillety/**/*.py", "infra/**/*", "demo/**/*"]
+PATTERNS = ["docs/**/*.md", "spillety/**/*.py", "infra/**/*", "demo/**/*", "scripts/*.py", "tests/*.py", "pyproject.toml", "CITATION.cff"]
 MUST = ["README.md", "temp.md", "docs/architecture.md"]
+EXCLUDE = {"node_modules", "__pycache__", ".git", ".venv", "venv", "dist", "build", "package-lock.json"}
+
+
+def _is_excluded(path: Path) -> bool:
+    return any(part in EXCLUDE for part in path.parts)
+
+
 def collect():
     files = []
     for pat in PATTERNS:
         for p in Path(".").glob(pat):
-            if p.is_file():
+            if p.is_file() and not _is_excluded(p):
                 files.append(p.as_posix())
     for m in MUST:
         if m not in files and Path(m).exists():
             files.append(m)
     return sorted(set(files))
+
+
 def build_block(paths):
     if not paths:
         return f"{START}\n<!-- no files -->\n{END}"
     return "\n".join([START] + [f"- `{p}`" for p in paths] + [END])
+
+
 def main():
     if not SKILL.exists():
         print(f"SKILL not found: {SKILL}")
@@ -39,5 +51,7 @@ def main():
     else:
         print(f"no changes {SKILL}: {len(paths)} links")
     return 0
+
+
 if __name__ == "__main__":
     raise SystemExit(main())

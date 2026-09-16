@@ -13,8 +13,8 @@ Spillety - студенческий Know Your Transaction движок. Осно
 > [!IMPORTANT] 
 > Jupyter notebooks: подготовка данных
 > ```bash
-> make data        # распакует archive.zip → data/elliptic_raw/ (или скачает via kaggle)
+> make data        # распакует archive.zip в папку data/elliptic_raw/ (или скачает из kaggle)
 > make notebooks   # pip install -r docs/notebooks/requirements-notebooks.txt
 > jupyter lab docs/notebooks/
 > ```
-> Ноутбуки читают его только через `docs/notebooks/_elliptic_loader.py` (read-only). Подробности — `data/README.md` и `scripts/download_elliptic.py`.
+> Notebooks читают elliptic датасет через единый `docs/notebooks/_elliptic_loader.py` 

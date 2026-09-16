@@ -1,1 +1,0 @@
-{"temporal_split": {"train_end": "2015-12-31", "val_end": "2016-06-30", "test_end": "2016-12-31"}, "hard_negative": {"knn_k": 10, "cosine_threshold": 0.85, "ratio_hard_easy": 0.5}, "labels": ["scam", "ransomware", "terrorist_financing", "sanctions", "mixer", "legitimate"], "seed": 42, "label_confidence_threshold": 0.8}

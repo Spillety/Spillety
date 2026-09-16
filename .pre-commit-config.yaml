@@ -2,7 +2,7 @@ repos:
   - repo: local
     hooks:
       - id: docstring-linter
-        name: K-BRAIN Docstring Formatter (check)
+        name: Docstring Formatter
         entry: python lint/docstring_linter.py --check
         language: system
         files: \.py$

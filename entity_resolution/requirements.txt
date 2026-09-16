@@ -1,4 +1,0 @@
-networkx>=3.2
-scikit-learn>=1.4
-numpy>=1.26
-pyyaml>=6.0

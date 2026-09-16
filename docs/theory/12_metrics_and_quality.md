@@ -28,15 +28,15 @@
 
 ## 12.1. Постановка задачи
 
-Компоненты Spillety (entity resolution, contrastive learning, causal-фильтр, GBDT, калибровка, cost-функция, temporal validation, evidence/WORM) обладают локальными метриками. Система в целом требует единого метрического контура, который:
+Компоненты Spillety обладают локальными метриками. Система в целом требует единого метрического контура, который:
 
 1. Отражает фактические характеристики без завышенных заявлений.
 2. Сравним с baseline (тривиальный предиктор, XGBoost на Elliptic++).
 3. Оценён на hold-out с временной изоляцией.
-4. Разделяет retrieval, scoring, калибровку, операционный и стоимостный контуры, а также self-evolution.
+4. Разделяет retrieval, scoring, калибровку, операционный и стоимостной контуры, а также self-evolution.
 5. Явно учитывает base rate.
 
-> Теоретически мы оцениваем наше решение вот так: PR-AUC, Precision@K, Recall@K, Brier, ECE, FP-rate, alert-to-SAR, TTD, latency p99, cost per alert, drift KS, audit verification, Merkle proof size, SR 26-2 validation, bias equalized odds.
+Оценка: PR-AUC, Precision@K, Recall@K, Brier, ECE, FP-rate, alert-to-SAR, TTD, latency p99, cost per alert, drift KS, audit verification, Merkle proof size, SR 26-2 validation, bias equalized odds.
 
 ---
 
@@ -91,7 +91,7 @@
 \text{Brier} = \frac{1}{n}\sum_{i=1}^{n}(\hat{p}_i - y_i)^2
 \]
 
-Интерпретация: $0$ — идеально, $0.25$ — случайный предиктор при сбалансированных классах (для imbalanced — смещён). Baseline — тривиальный предиктор $\hat{p}_i \equiv \text{base rate}$.
+$0$ — идеально, $0.25$ — случайный предиктор при сбалансированных классах (для imbalanced — смещён). Baseline — тривиальный предиктор $\hat{p}_i \equiv \text{base rate}$.
 
 ### 12.4.2. ECE
 
@@ -160,7 +160,7 @@ $B_m$ — бин $m$, $M=10$–$15$. Порог плохой калибровк�
 \text{Cost per alert} = \frac{\text{FTE cost} + \text{infrastructure cost}}{\#\text{alerts}}
 \]
 
-> Теоретически мы оцениваем стоимость вот так: cost per alert совместно с latency p99, FP-rate и alert-to-SAR, а также PR-AUC, Precision@K, Recall@K, Brier, ECE, TTD, drift KS, audit verification, Merkle proof size, SR 26-2 validation, bias equalized odds.
+Оценка: cost per alert совместно с latency p99, FP-rate и alert-to-SAR, а также PR-AUC, Precision@K, Recall@K, Brier, ECE, TTD, drift KS, audit verification, Merkle proof size, SR 26-2 validation, bias equalized odds.
 
 ---
 
@@ -193,11 +193,11 @@ $$d_{\text{median}}(a_{\text{new}}) = \text{median}_{a\in\mathcal{A}_{\text{old}
 | SR 26-2 validation | Покрытие conceptual soundness / outcomes analysis / ongoing monitoring | Чек-лист валидации per tier (High/Medium/Low) |
 | Bias equalized odds | $\Delta\text{TPR}\approx 0$, $\Delta\text{FPR}\approx 0$ across jurisdictions | Bootstrap CI по группам, SHAP-анализ прокси-признаков |
 
-**Выбор fairness-критерия: demographic parity vs equalized odds vs predictive parity.** Между вариантами выбор обосновывается bootstrap CI по группам, влиянием на recall@K и latency, а также регуляторным контекстом. Для Spillety базовым принят equalized odds.
+**Выбор fairness-критерия: demographic parity vs equalized odds vs predictive parity.** Выбор обосновывается bootstrap CI по группам, влиянием на recall@K и latency, а также регуляторным контекстом. Для Spillety базовым принят equalized odds.
 
 **Выбор materiality: High vs Medium vs Low** тестируется SR 26-2 validation, PR-AUC/Precision@K/Recall@K с bootstrap CI и latency p99.
 
-**Выбор подписи/агрегации: Ed25519 vs ECDSA, Merkle vs flat** тестируется latency, audit verification и Merkle proof size (bootstrap CI, recall@K как контроль деградации retrieval при квантизации).
+**Выбор подписи/агрегации: Ed25519 vs ECDSA, Merkle vs flat** тестируется latency, audit verification и Merkle proof size.
 
 ---
 
@@ -222,13 +222,13 @@ $$d_{\text{median}}(a_{\text{new}}) = \text{median}_{a\in\mathcal{A}_{\text{old}
 n = \frac{z_{1-\alpha/2}^2 \cdot p(1-p)}{e^2}
 \]
 
-Пример: $p=0.05$, $e=0.01$, $95\%$ CI $\to n\approx 1825$. Для Spillety размер random sampling из auto-clear пересчитывается ежемесячно; power analysis обеспечивает unbiased оценку precision/recall (ср. блок 8, active learning без selection bias).
+Пример: $p=0.05$, $e=0.01$, $95\%$ CI $\to n\approx 1825$. Для Spillety размер random sampling из auto-clear пересчитывается ежемесячно; power analysis обеспечивает unbiased оценку precision/recall.
 
 ---
 
 ## 12.11. Визуализация
 
-> Код для генерации графиков вынесен в [`files/11_visualization.py`](./files/11_visualization.py) — сохранён без изменений.
+Код для генерации графиков: [`files/11_visualization.py`](./files/11_visualization.py).
 
 ![pr auc comparison](./files/11-10-1_pr_auc_comparison.png)
 
@@ -275,25 +275,7 @@ n = \frac{z_{1-\alpha/2}^2 \cdot p(1-p)}{e^2}
 
 ---
 
-**Резюме.** Метрический контур Spillety охватывает ранжирование, калибровку, операционные и стоимостные показатели, self-evolution и доверие.
+## См. также
 
-| Группа | Ключевые метрики | Протокол |
-|--------|------------------|----------|
-| Ранжирование | PR-AUC, Precision@K, Recall@K | Hold-out temporal split, bootstrap CI |
-| Калибровка | Brier, ECE (isotonic vs beta) | Reliability diagram, ECE/Brier CI |
-| Операционные | FP-rate, alert-to-SAR, TTD, latency p99 | Операционные данные, бенчмарк |
-| Стоимость | labeling cost, FTE, cost per alert | Операционные данные, power analysis |
-| Self-evolution | temporal validation, drift KS, recall@K новых санкций | Мониторинг, temporal split |
-| Доверие | audit verification, Merkle proof size, SR 26-2, equalized odds | Криптоверификация, чек-лист, bootstrap CI |
-
-> Теоретически мы оцениваем наше решение вот так: PR-AUC, Precision@K, Recall@K, Brier, ECE, FP-rate, alert-to-SAR, TTD, latency p99, cost per alert, drift KS, audit verification, Merkle proof size, SR 26-2 validation, bias equalized odds — полный набор, измеряемый на temporal hold-out с bootstrap CI и бенчмарками latency/recall.
-
-**Практические выводы:**
-
-- PR-AUC дополняется precision при рабочем пороге с указанием base rate.
-- Brier и ECE взаимодополняют друг друга; выбор isotonic vs beta — по ECE/Brier на hold-out с bootstrap CI.
-- FP-rate связан с cost-функцией и порогом.
-- Labeling cost и FTE — ключевые для unit economics.
-- Temporal validation и drift KS — основа self-evolution.
-- Random sampling требует power analysis.
-- Audit verification, Merkle proof size, SR 26-2 validation и equalized odds — обязательная часть отчётности.
+- [12_metrics_dashboard.ipynb](../notebooks/12_metrics_dashboard.ipynb) — дашборд метрик и мониторинг качества.
+- [13_end_to_end_pipeline.ipynb](../notebooks/13_end_to_end_pipeline.ipynb) — end-to-end пайплайн с полным контуром метрик.

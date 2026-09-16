@@ -29,7 +29,7 @@ Spillety рассматривается в пяти регуляторных р�
 4. **6AMLD** — учёт predicate offences в приоритизации алертов.
 5. **Daubert** — обеспечение court-admissibility.
 
-> Теоретически мы оцениваем наше решение вот так: PR-AUC, Precision@K, Recall@K, Brier, ECE, FP-rate, alert-to-SAR, TTD, latency p99, cost per alert, drift KS, audit verification, Merkle proof size, SR 26-2 validation, bias equalized odds.
+Оценка: PR-AUC, Precision@K, Recall@K, Brier, ECE, FP-rate, alert-to-SAR, TTD, latency p99, cost per alert, drift KS, audit verification, Merkle proof size, SR 26-2 validation, bias equalized odds.
 
 ---
 
@@ -46,11 +46,11 @@ Spillety рассматривается в пяти регуляторных р�
 | Последствия несоответствия | Возможна supervisory criticism | Non-compliance с guidance alone не влечёт criticism; action возможен при unsafe or unsound practices |
 | Мониторинг | Validation-centric | Усилен ongoing monitoring и outcomes analysis |
 
-SR 26-2 применяется к banking organizations с активами > $30 млрд. Формальное руководство не устанавливает enforceable standards, но служит основанием для оценки soundness.
+SR 26-2 применяется к banking organizations с активами > $30 млрд. Руководство не устанавливает enforceable standards, но служит основанием для оценки soundness.
 
 ### 11.2.2. Модель materiality
 
-Materiality определяется как сочетание:
+Materiality — сочетание:
 
 - **Model exposure** — влияние выхода модели на бизнес-решения.
 - **Model purpose** — использование для регуляторных требований или финансового риск-менеджмента.
@@ -61,7 +61,7 @@ Materiality определяется как сочетание:
 | Medium | Влияет на решения | Финансовый | Валидация + мониторинг |
 | Low | Информационный | Внутренний | Идентификация + performance monitoring |
 
-**Выбор уровня materiality: High vs Medium vs Low.** Между этими вариантами решение принимается на тестах: bootstrap CI для PR-AUC и Precision@K/Recall@K на temporal split, latency p99 бенчмарк, SR 26-2 validation outcomes (above/below-the-line), а также оценка TTD и alert-to-SAR. High-tier требует annual independent validation; Medium — validation + monitoring; Low — ongoing monitoring.
+**Выбор уровня materiality: High vs Medium vs Low.** Решение принимается на тестах: bootstrap CI для PR-AUC и Precision@K/Recall@K на temporal split, latency p99 бенчмарк, SR 26-2 validation outcomes, оценка TTD и alert-to-SAR. High-tier требует annual independent validation; Medium — validation + monitoring; Low — ongoing monitoring.
 
 ### 11.2.3. Классификация компонентов Spillety
 
@@ -202,7 +202,7 @@ SAR не подаётся автоматически; обязателен human
 
 Регуляторы (EBA, AI Act) требуют детекции и митигации нежелательного смещения. В FCP-домене риски: повышенный FP-rate для отдельных юрисдикций, country-contingent differential treatment, levelling down при попытке выравнивания precision.
 
-### 11.7.2. Метрики справедливости: выбор
+### 11.7.2. Метрики справедливости
 
 | Метрика | Определение |
 |---------|-------------|
@@ -210,7 +210,7 @@ SAR не подаётся автоматически; обязателен human
 | Equalized odds | Равенство TPR и FPR across groups |
 | Predictive parity | Равенство precision (PPV) across groups |
 
-**Выбор: demographic parity vs equalized odds vs predictive parity.** Метрики несовместимы одновременно; выбор зависит от контекста. Для юрисдикционного аудита Spillety приоритет — **equalized odds** (контроль TPR и FPR), поскольку регулятору критичны как пропуски, так и ложные срабатывания. Оценка — bootstrap CI по группам, проверка significance, отчёт по FP-rate и alert-to-SAR.
+Метрики несовместимы одновременно; выбор зависит от контекста. Для юрисдикционного аудита Spillety приоритет — **equalized odds** (контроль TPR и FPR), поскольку регулятору критичны как пропуски, так и ложные срабатывания. Оценка — bootstrap CI по группам, проверка significance, отчёт по FP-rate и alert-to-SAR.
 
 ### 11.7.3. Jurisdiction-level fairness audit
 
@@ -261,7 +261,7 @@ SAR не подаётся автоматически; обязателен human
 
 ## 11.10. Метрический контур регуляторного соответствия
 
-> Теоретически мы оцениваем регуляторное соответствие вот так: PR-AUC, Precision@K, Recall@K, Brier, ECE, FP-rate, alert-to-SAR, TTD, latency p99, cost per alert, drift KS, audit verification, Merkle proof size, SR 26-2 validation, bias equalized odds.
+Оценка: PR-AUC, Precision@K, Recall@K, Brier, ECE, FP-rate, alert-to-SAR, TTD, latency p99, cost per alert, drift KS, audit verification, Merkle proof size, SR 26-2 validation, bias equalized odds.
 
 SR 26-2 validation измеряется как полнота conceptual soundness / outcomes analysis / ongoing monitoring; bias — equalized odds across jurisdictions; audit — верификация Ed25519+Merkle+OTS.
 
@@ -281,23 +281,6 @@ SR 26-2 validation измеряется как полнота conceptual soundne
 
 ---
 
-**Резюме.** Регуляторное соответствие — условие эксплуатации. SR 26-2 задаёт классификацию и risk-based governance; FATF Rec. 16 — Travel Rule; FinCEN — сроки SAR; 6AMLD — predicate offences; Daubert — судебные критерии; bias-аудит — equalized odds. Формальная оценка соответствия включена в единый метрический контур.
+## См. также
 
-| Режим | Требование | Реализация Spillety |
-|-------|------------|---------------------|
-| SR 26-2 | Классификация, materiality, валидация | GBDT=model, encoder=model, retrieval=not model |
-| FATF Rec. 16 | Travel Rule data | Evidence JSON + VASP-интеграции |
-| FinCEN SAR | Своевременная подача | Авто-генерация + human review |
-| 6AMLD | Predicate offence classification | DAG + anchor metadata |
-| Daubert | Court-admissibility | Independent validation + adversarial testing |
-| Bias audit | Fairness | Jurisdiction-level audit + SHAP, equalized odds |
-
-**Практические выводы:**
-
-- SR 26-2 заменяет SR 11-7; governance — risk-based, materiality — явная.
-- Определение model сужено; rule-based инструменты могут не квалифицироваться, но подлежат FFIEC-тестированию.
-- FATF Rec. 16: стандартизированные требования; ЕС — нулевой порог.
-- FinCEN: 30 дней initial, 120 дней continuing.
-- 6AMLD: 22 predicate offences.
-- Daubert: testability, error rate, peer review, general acceptance.
-- Bias: equalized odds — базовый критерий; выбор между parity-видами обосновывается bootstrap CI и recall@K/latency.
+- [12_metrics_dashboard.ipynb](../notebooks/12_metrics_dashboard.ipynb) — метрики качества и мониторинг compliance.

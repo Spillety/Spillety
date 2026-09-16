@@ -20,13 +20,13 @@
 
 ## 10.1. Постановка задачи
 
-Риск-скор $p \in [0,1]$, полученный GBDT, недостаточен для регуляторного и судебного применения. Требуется формально верифицируемое обоснование решения: полный набор входов, промежуточных признаков, причинных путей и криптографических гарантий неизменяемости.
+Риск-скор $p \in [0,1]$, полученный GBDT, недостаточен для регуляторного и судебного применения. Требуется верифицируемое обоснование решения: полный набор входов, промежуточных признаков, причинных путей и криптографических гарантий неизменяемости.
 
-Задача evidence generation формализуется как отображение
+Задача evidence generation:
 
-$$\mathcal{E}: (w, \mathcal{A}_K, \mathcal{G}, \theta) \mapsto J,$$
+$$\mathcal{E}: (w, \mathcal{A}_K, \mathcal{G}, \theta) \mapsto J$$
 
-где $w$ — кошелёк, $\mathcal{A}_K$ — top-$K$ anchors после causal-фильтра, $\mathcal{G}$ — графовые признаки, $\theta$ — версии моделей, $J$ — Evidence JSON. WORM-аудит гарантирует выполнение свойств целостности, включения и временной привязки для каждого $J$.
+где $w$ — кошелёк, $\mathcal{A}_K$ — top-$K$ anchors после causal-фильтра, $\mathcal{G}$ — графовые признаки, $\theta$ — версии моделей, $J$ — Evidence JSON. WORM-аудит гарантирует выполнение свойств целостности, включения и временной привязки.
 
 Мотивация трёх уровней:
 
@@ -34,7 +34,7 @@ $$\mathcal{E}: (w, \mathcal{A}_K, \mathcal{G}, \theta) \mapsto J,$$
 2. **Судебная (Daubert):** без неизменяемости алерт не обладает court-admissibility.
 3. **Операционная:** аналитик, compliance-офицер и независимый валидатор обязаны наблюдать идентичную версию артефакта.
 
-> Теоретически мы оцениваем наше решение вот так: PR-AUC, Precision@K, Recall@K, Brier, ECE, FP-rate, alert-to-SAR, TTD, latency p99, cost per alert, drift KS, audit verification, Merkle proof size, SR 26-2 validation, bias equalized odds.
+Оценка: PR-AUC, Precision@K, Recall@K, Brier, ECE, FP-rate, alert-to-SAR, TTD, latency p99, cost per alert, drift KS, audit verification, Merkle proof size, SR 26-2 validation, bias equalized odds.
 
 ---
 
@@ -60,16 +60,16 @@ $$\mathcal{E}: (w, \mathcal{A}_K, \mathcal{G}, \theta) \mapsto J,$$
 }
 ```
 
-Валидация схемы обязательна при генерации; каждое поле — required.
+Валидация схемы обязательна; каждое поле — required.
 
 | Поле | Тип | Семантика |
 |------|-----|-----------|
-| alert_id | UUID v4 | Уникальный идентификатор алерта |
+| alert_id | UUID v4 | Уникальный идентификатор |
 | risk_score | float $[0,1]$ | Калиброванная вероятность $P(\text{illicit})$ |
 | confidence_tier | enum {Tier 1, Tier 2, Tier 3, auto-clear} | Операционное решение |
-| anchors | array | Список anchors, прошедших retrieval и causal-фильтр |
+| anchors | array | Anchors, прошедшие retrieval и causal-фильтр |
 | causal_path | array | Причинные рёбра и оценки эффекта |
-| graph_features | object | Структурные и темпоральные признаки кошелька |
+| graph_features | object | Структурные и темпоральные признаки |
 | shap_values | object | Вклады признаков (SHAP) |
 | provenance | object | Источник, версии моделей, аналитик, дата |
 | audit | object | Подпись, Merkle-proof, OTS |
@@ -202,15 +202,15 @@ graph TD
     H2 --> L4[Hash Alert 4]
 ```
 
-Оценка выбора: bootstrap CI для latency верификации, recall@K не затрагивается, audit verification rate = 100% в тестах, Merkle proof size логируется как метрика. Merkle предпочтителен.
+Оценка выбора: bootstrap CI для latency верификации, recall@K не затрагивается, audit verification rate = 100% в тестах. Merkle предпочтителен.
 
-Процедура: $h_i = \text{SHA-256}(J_{c,i})$, внутренние узлы $h_{p} = \text{SHA-256}(h_{left} \| h_{right})$, корень $R$ фиксируется периодически (например, ежесуточно). Proof для листа $i$ — последовательность sibling-хешей на пути к $R$.
+Процедура: $h_i = \text{SHA-256}(J_{c,i})$, внутренние узлы $h_{p} = \text{SHA-256}(h_{left} \| h_{right})$, корень $R$ фиксируется периодически. Proof для листа $i$ — последовательность sibling-хешей на пути к $R$.
 
 ### 10.3.3. OpenTimestamps
 
 OTS агрегирует корни множества пользователей в единый Bitcoin-анкор: корень $R$ отправляется на OTS-агрегатор, включается в транзакцию Bitcoin, возвращается OTS-proof, связывающий $R$ с блоком Bitcoin.
 
-Свойства: содержимое не раскрывается (в OTS уходит только хеш), временная привязка внешне верифицируема, компрометация внутренних часов не влияет на доказательство.
+Свойства: содержимое не раскрывается (в OTS уходит только хеш), временная привязка внешне верифицируема, компрометация внутренних часов не влияет.
 
 Latency OTS — асинхронный (до нескольких часов); для срочных SAR первичная гарантия — Ed25519+Merkle, OTS дополняет её ретроспективно.
 
@@ -273,9 +273,9 @@ SAR покрывает обязательные поля:
 
 ## 10.6. Метрики качества
 
-> Теоретически мы оцениваем наше решение вот так: PR-AUC, Precision@K, Recall@K, Brier score, ECE, FP-rate на аналитика, alert-to-SAR conversion, TTD, latency p99, cost per alert, drift KS (p-value), audit verification rate, Merkle proof size (байт, $O(\log N)$), SR 26-2 validation (conceptual soundness / outcomes analysis / ongoing monitoring), bias equalized odds (TPR и FPR across jurisdictions).
+Оценка: PR-AUC, Precision@K, Recall@K, Brier score, ECE, FP-rate на аналитика, alert-to-SAR conversion, TTD, latency p99, cost per alert, drift KS (p-value), audit verification rate, Merkle proof size (байт, $O(\log N)$), SR 26-2 validation (conceptual soundness / outcomes analysis / ongoing monitoring), bias equalized odds (TPR и FPR across jurisdictions).
 
-Детализация — в блоке 12. Здесь метрики применяются к evidence/WORM-контуру: Brier/ECE — к калиброванным $p$ в JSON, TTD — от первого on-chain сигнала до фиксации алерта, latency p99 — от HNSW-lookup до генерации подписанного JSON, drift KS — к распределениям embeddings, audit verification — доля успешных Ed25519+Merkle+OTS проверок, Merkle proof size — по формуле $\log_2 N \cdot 32$.
+Метрики применяются к evidence/WORM-контуру: Brier/ECE — к калиброванным $p$ в JSON, TTD — от первого on-chain сигнала до фиксации алерта, latency p99 — от HNSW-lookup до генерации подписанного JSON, drift KS — к распределениям embeddings, audit verification — доля успешных Ed25519+Merkle+OTS проверок, Merkle proof size — по формуле $\log_2 N \cdot 32$.
 
 ---
 
@@ -287,7 +287,7 @@ SAR покрывает обязательные поля:
 
 ![audit trail](./files/9-5-2_audit_trail.png)
 
-**Audit trail:** хронология жизненного цикла алерта. Цвет — тип события (создание, просмотр, review, escalation, SAR filing, верификация).
+**Audit trail:** хронология жизненного цикла алерта. Цвет — тип события.
 
 ```mermaid
 sequenceDiagram
@@ -353,3 +353,9 @@ Evidence generation и WORM-аудит совместно обеспечиваю
 - Выбор Merkle против flat обоснован асимптотикой proof size и latency; подтверждается bootstrap CI и измерением Merkle proof size.
 - Каждый алерт — канонический JSON с provenance и audit-полями; любая модификация детектируется.
 - SAR формируется из Evidence JSON, но подаётся только после human review.
+
+---
+
+## См. также
+
+- [11_evidence_worm_audit.ipynb](../notebooks/11_evidence_worm_audit.ipynb) — генерация evidence JSON, подпись и верификация WORM-аудита.

@@ -145,7 +145,7 @@ def plot_shap_summary(shap_values, feature_names,
 # ============================================================
 
 if __name__ == "__main__":
-    np.random.seed(42)
+    np.random.seed(72)
 
     n_samples = 10000
     y_true = np.random.binomial(1, 0.05, n_samples)  # 5% illicit

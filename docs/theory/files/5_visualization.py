@@ -79,7 +79,7 @@ def plot_pr_curve_for_clustering(precisions, recalls, thresholds, title="PR curv
 
 # Пример вызова
 if __name__ == "__main__":
-    np.random.seed(42)
+    np.random.seed(72)
     
     # Синтетические данные: степенное распределение размеров кластеров
     # (типично для blockchain: много мелких, мало крупных)

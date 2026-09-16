@@ -156,7 +156,7 @@ def plot_walk_forward_validation(fold_metrics, title="Walk-forward validation",
 
 # Пример вызова
 if __name__ == "__main__":
-    np.random.seed(42)
+    np.random.seed(72)
     
     # --- Temporal validation ---
     import datetime

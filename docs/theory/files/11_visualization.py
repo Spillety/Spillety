@@ -122,7 +122,7 @@ def plot_drift_monitoring(ks_statistics, timestamps,
 
 
 if __name__ == "__main__":
-    np.random.seed(42)
+    np.random.seed(72)
     n_samples = 10000
     y_true = np.random.binomial(1, 0.05, n_samples)
     y_prob_baseline = np.clip(y_true * 0.3 + np.random.randn(n_samples) * 0.15 + 0.05, 0, 1)

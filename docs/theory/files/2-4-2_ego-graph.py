@@ -6,7 +6,7 @@ import numpy as np
 sns.set_style("whitegrid")
 plt.rcParams['font.family'] = 'DejaVu Sans'
 
-np.random.seed(42)
+np.random.seed(72)
 G = nx.Graph()
 
 # Central node
@@ -25,7 +25,7 @@ for i, n in enumerate(neighbors):
         G.add_edge(n, second)
         G.nodes[second]["type"] = "second"
 
-pos = nx.spring_layout(G, seed=42, k=0.6)
+pos = nx.spring_layout(G, seed=72, k=0.6)
 
 node_colors = []
 for node in G.nodes():

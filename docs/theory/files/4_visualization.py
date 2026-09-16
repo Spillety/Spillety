@@ -17,7 +17,7 @@ def visualize_embeddings(embeddings, labels, title="t-SNE projection of wallet e
         title: заголовок графика
     """
     # t-SNE проекция в 2D
-    tsne = TSNE(n_components=2, perplexity=30, random_state=42, max_iter=1000)
+    tsne = TSNE(n_components=2, perplexity=30, random_state=72, max_iter=1000)
     embeddings_2d = tsne.fit_transform(embeddings)
     
     # Создание DataFrame для seaborn
@@ -167,7 +167,7 @@ def plot_ntxent_training_curve(train_losses, val_losses, title="NT-Xent training
 
 # Пример вызова (с синтетическими данными)
 if __name__ == "__main__":
-    np.random.seed(42)
+    np.random.seed(72)
     
     # Синтетические данные: 4 кластера по 500 точек в 128-мерном пространстве
     n_per_class = 500

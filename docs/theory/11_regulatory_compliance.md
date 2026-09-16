@@ -1,356 +1,303 @@
-# 11. Метрики и оценка качества
-
-> **О чём этот блок простыми словами.**
-> Как понять, что система реально работает, а не только «выглядит хорошо на бумаге»? Для этого нужны честные метрики: одни измеряют качество ранжирования, другие — калибровку, третьи — операционную работу и экономику. Этот блок описывает **полный набор метрик** и, что важно, **чего Spillety не обещает**.
+# 11. Регуляторное соответствие: SR 26-2, FATF, FinCEN, 6AMLD, Daubert и bias-аудит
 
 ### Термины
 
 | Термин | Определение |
 |--------|-------------|
-| PR-AUC | Area Under Precision-Recall Curve — площадь под кривой precision-recall |
-| Precision@K | Доля релевантных объектов среди top-K, возвращённых retrieval |
-| Recall@K | Доля истинных соседей, попавших в top-K ближайших |
-| Brier score | Средний квадрат разности между предсказанной вероятностью и исходом |
-| ECE | Expected Calibration Error — ожидаемая ошибка калибровки |
-| TTD | Time To Detection — время от первого on-chain сигнала до алерта |
-| Labeling cost | Стоимость верификации разметки (в Spillety — стоимость верификации court documents) |
-| FTE | Full-Time Equivalent — число сотрудников, эквивалентное полной занятости |
-| Power analysis | Статистический метод определения минимального размера выборки для достижения заданной мощности теста |
-| Base rate | Доля положительного класса в популяции |
-| Walk-forward validation | Схема валидации, при которой обучение идёт на прошлом, тест — на будущем, с постепенным сдвигом окна |
+| SR 26-2 | Revised Guidance on Model Risk Management, Federal Reserve, 17 апреля 2026; заменяет SR 11-7 и SR 21-8 |
+| Model Risk Management (MRM) | Управление рисками, связанными с моделями: governance, валидация, мониторинг |
+| Materiality | Произведение model exposure (значимость выхода для решений) и model purpose (регуляторное/финансовое назначение) |
+| FATF Rec. 16 (Travel Rule) | Требование сопровождения платежа информацией об отправителе и получателе; для virtual assets — off-chain обмен между VASP |
+| FinCEN SAR | Suspicious Activity Report, подаваемый при подозрении на illicit-активность |
+| 6AMLD | Sixth Anti-Money Laundering Directive ЕС: гармонизация predicate offences |
+| Daubert | Критерии допустимости экспертных показаний в суде США: testability, error rate, peer review, general acceptance |
+| FFIEC | Federal Financial Institutions Examination Council; стандарты BSA/AML-экзамена |
+| Bias audit | Проверка систематического смещения модели относительно защищённых групп |
+| Equalized odds | Равенство TPR и FPR across groups |
 
 ---
 
 ## 11.1. Постановка задачи
 
-> **Простыми словами.** Одной цифры «точность 95%» недостаточно. Нужно честно измерять разные стороны системы и сравнивать с простыми baseline'ами. И не обещать невозможного.
+Техническая корректность системы не тождественна регуляторной приемлемости. Финансовый институт не вправе эксплуатировать инструмент, не классифицированный по SR 26-2, не соответствующий FATF Rec. 16, не генерирующий FinCEN SAR и не удовлетворяющий критериям Daubert.
 
-В предыдущих блоках были описаны компоненты Spillety: entity resolution, contrastive learning, causal filter, GBDT, калибровка, cost-функция. Каждый компонент имеет свои внутренние метрики, но **система в целом** требует набора метрик, которые:
+Spillety рассматривается в пяти регуляторных режимах:
 
-1. **Честно отражают реальные характеристики** — без завышенных обещаний.
-2. **Сравнимы с baseline** — конкурентами и тривиальными предикторами.
-3. **Обоснованы эмпирически** — на hold-out данных, а не на training set.
-4. **Разделяют компоненты** — retrieval, scoring, калибровка, операционные метрики.
-5. **Учитывают base rate** — precision при base rate 0.1% и 5% — это разные precision.
+1. **SR 26-2** — классификация компонентов, materiality, валидация и governance.
+2. **FATF Rec. 16** — Travel Rule для VASP-транзакций.
+3. **FinCEN SAR** — генерация и своевременная подача отчётов.
+4. **6AMLD** — учёт predicate offences в приоритизации алертов.
+5. **Daubert** — обеспечение court-admissibility.
 
-Этот блок описывает **полный набор метрик**, способ их получения и то, что Spillety **не обещает**.
-
----
-
-## 11.2. Классификация метрик
-
-Метрики делятся на пять групп:
-
-| Группа | Что измеряет | Примеры |
-|--------|--------------|---------|
-| **Качество ранжирования** | Насколько хорошо модель отделяет illicit от legit | PR-AUC, Precision@K, Recall@K |
-| **Калибровка** | Насколько предсказанные вероятности соответствуют реальности | Brier, ECE |
-| **Операционные** | Как система работает в проде | FP-rate на аналитика, alert-to-SAR, TTD, latency |
-| **Стоимость** | Экономика системы | Labeling cost, FTE, cost per alert |
-| **Self-evolution** | Способность адаптироваться | Temporal validation, drift (KS) |
+> Теоретически мы оцениваем наше решение вот так: PR-AUC, Precision@K, Recall@K, Brier, ECE, FP-rate, alert-to-SAR, TTD, latency p99, cost per alert, drift KS, audit verification, Merkle proof size, SR 26-2 validation, bias equalized odds.
 
 ---
 
-## 11.3. Метрики качества ранжирования
+## 11.2. SR 26-2: классификация и materiality
 
-### 11.3.1. PR-AUC
+### 11.2.1. Отличия от SR 11-7
 
-**PR-AUC** — площадь под кривой precision-recall. В отличие от ROC-AUC, PR-AUC чувствителен к base rate: при низкой доле положительного класса ROC-AUC может быть высоким, даже если precision низкий .
+| Область | SR 11-7 | SR 26-2 |
+|---------|---------|---------|
+| Governance | Единообразная строгость | Risk-based, tiered by materiality |
+| Определение модели | Широкое, включало rule-based tools | Сужено до сложных количественных методов со статистической/экономической/финансовой теорией |
+| Materiality | Имплицитная | Явная: exposure × purpose |
+| GenAI / Agentic AI | Не адресовано | Явно вне scope; принципы применяются по аналогии |
+| Последствия несоответствия | Возможна supervisory criticism | Non-compliance с guidance alone не влечёт criticism; action возможен при unsafe or unsound practices |
+| Мониторинг | Validation-centric | Усилен ongoing monitoring и outcomes analysis |
 
-**Формально:**
+SR 26-2 применяется к banking organizations с активами > $30 млрд. Формальное руководство не устанавливает enforceable standards, но служит основанием для оценки soundness.
 
-\[
-\text{PR-AUC} = \int_0^1 \text{Precision}(\text{Recall}) \, d\text{Recall}
-\]
+### 11.2.2. Модель materiality
 
-**Как получаем:** hold-out temporal split. Обучение на ранних временных шагах, тест — на поздних. PR-curve строится на тесте.
+Materiality определяется как сочетание:
 
-**Baseline:** XGBoost на Elliptic++ (56 признаков). Сравнение с baseline показывает, даёт ли архитектура Spillety прирост.
+- **Model exposure** — влияние выхода модели на бизнес-решения.
+- **Model purpose** — использование для регуляторных требований или финансового риск-менеджмента.
 
-**Проблема imbalanced классов:** при base rate 0.1% precision даже у хорошей модели может быть низким. PR-AUC не заменяет precision при рабочем пороге — он показывает **потенциал** модели.
+| Tier | Exposure | Purpose | Режим governance |
+|------|----------|---------|------------------|
+| High | Критичный для решений | Регуляторный | Полная валидация, независимый обзор |
+| Medium | Влияет на решения | Финансовый | Валидация + мониторинг |
+| Low | Информационный | Внутренний | Идентификация + performance monitoring |
 
-### 11.3.2. Precision@K
+**Выбор уровня materiality: High vs Medium vs Low.** Между этими вариантами решение принимается на тестах: bootstrap CI для PR-AUC и Precision@K/Recall@K на temporal split, latency p99 бенчмарк, SR 26-2 validation outcomes (above/below-the-line), а также оценка TTD и alert-to-SAR. High-tier требует annual independent validation; Medium — validation + monitoring; Low — ongoing monitoring.
 
-**Precision@K** — доля релевантных объектов среди top-K, возвращённых retrieval.
+### 11.2.3. Классификация компонентов Spillety
 
-**Формально:**
+| Компонент | Классификация по SR 26-2 | Основание |
+|-----------|--------------------------|-----------|
+| Contrastive encoder (GraphSAGE) | **Model** | Сложный количественный метод с теорией contrastive learning |
+| Causal DAG | **Expert-based model** | Документированные допущения; не статистический метод в строгом смысле |
+| GBDT (LightGBM) | **Model** | Количественный метод со статистической теорией |
+| Rule-based filters | **Может не квалифицироваться как model** | Детерминированные правила без статистической теории |
+| HNSW retrieval | **Not model** | Детерминированный алгоритм поиска |
+| LLM Explainer | **Исключён из scope** | Generative AI вне SR 26-2 (принципы governance — по аналогии) |
 
-\[
-\text{Precision@K} = \frac{|\{\text{relevant}\} \cap \{\text{top-K}\}|}{K}
-\]
+Независимо от классификации non-model компоненты подлежат FFIEC independent testing: верификация логики и реализации.
 
-**Применение в Spillety:** retrieval возвращает top-K anchors для кошелька. Precision@K показывает, какая доля этих anchors действительно связана с кошельком (по ground truth).
+### 11.2.4. Требования к валидации
 
-**Как получаем K:** PR-curve на retrieval task; K выбирается по cost-функции.
+Три обязательные области:
 
-**Base rate учитывается:** precision при base rate 0.1% и 5% — разные. В отчёте указывается base rate.
+1. **Conceptual soundness** — соответствие дизайна риск-профилю института.
+2. **Outcomes analysis** — above-the-line и below-the-line тестирование.
+3. **Ongoing monitoring** — детекция drift и деградации.
 
-### 11.3.3. Recall@K
+Дополнение для AML: **data integrity testing** — верификация поступления данных, необходимых модели. Пример enforcement: штраф Wise US $4.2M (июль 2025) за SAR deficiencies и data integrity failures.
 
-**Recall@K** — доля истинных соседей, попавших в top-K ближайших.
+**Above-the-line / below-the-line:**
 
-**Формально:**
+- **Below-the-line:** снижение порога ниже production, replay исторических транзакций, обзор сработавших алертов — оценка under-detection.
+- **Above-the-line:** повышение порога, сэмплирование потерянных алертов — оценка продуктивности потерянных срабатываний.
 
-\[
-\text{Recall@K} = \frac{|\{\text{relevant}\} \cap \{\text{top-K}\}|}{|\{\text{relevant}\}|}
-\]
+Методология adjustments, расчёты размера выборки и результаты документируются; смещения оцениваются bootstrap CI.
 
-**Применение в Spillety:** recall@K на anchor retrieval показывает, насколько хорошо модель находит семантически близкие anchors для заданного кошелька.
+### 11.2.5. Частота валидации
 
-**Cluster-level evaluation:** recall@K оценивается на уровне кластеров, а не отдельных адресов. Это связано с тем, что кластер — более стабильная единица (блок 5).
-
-**Temporal validation:** recall@K оценивается на **новых** санкциях, добавленных после даты обучения. Это показывает, насколько модель обобщает на unseen anchors.
-
----
-
-## 11.4. Метрики калибровки
-
-### 11.4.1. Brier score
-
-\[
-\text{Brier} = \frac{1}{n} \sum_{i=1}^{n} (\hat{p}_i - y_i)^2
-\]
-
-где \(\hat{p}_i\) — предсказанная вероятность, \(y_i\) — истинная метка.
-
-**Интерпретация:** 0 — идеальная калибровка; 0.25 — случайный предиктор (при balanced classes). Для imbalanced классов Brier смещён.
-
-**Baseline:** тривиальный предиктор, предсказывающий base rate для всех объектов. Сравнение с ним показывает, даёт ли модель прирост.
-
-### 11.4.2. ECE
-
-\[
-\text{ECE} = \sum_{m=1}^{M} \frac{|B_m|}{n} \left| \text{acc}(B_m) - \text{conf}(B_m) \right|
-\]
-
-где \(B_m\) — бин \(m\), \(\text{acc}(B_m)\) — эмпирическая точность, \(\text{conf}(B_m)\) — средняя предсказанная вероятность.
-
-**Интерпретация:** 0 — идеальная калибровка; > 0.1 — плохая.
-
-**Число бинов:** фиксировано (обычно 10–15). Слишком мало — грубая оценка; слишком много — шум.
-
-**Сравнение методов калибровки:** isotonic vs beta calibration. Выбор по ECE на hold-out.
+Фиксированная частота не установлена; режим — risk-based, зависящий от materiality, скорости изменений и ограничений данных. Для Spillety: high-materiality (GBDT в decision path) — annual validation; low-materiality (retrieval) — ongoing monitoring и периодический review. Дрейф контролируется KS-тестом и мониторингом Brier/ECE.
 
 ---
 
-## 11.5. Операционные метрики
+## 11.3. FATF Rec. 16 (Travel Rule)
 
-### 11.5.1. FP-rate на аналитика
+### 11.3.1. Нормативные требования
 
-**FP-rate на аналитика** — число ложных срабатываний, которые аналитик обрабатывает за единицу времени.
+Информация об отправителе и получателе обязана сопровождать платёжное сообщение при cross-border переводе; для virtual assets — передача между VASP off-chain по защищённым каналам.
 
-**Как получаем:** operational data. Аналитик помечает каждый алерт как TP или FP. FP-rate = FP / (TP + FP) для данного аналитика.
+**Стандартизированные поля (суммы > USD/EUR 1 000):**
 
-**Baseline:** определяется из исторических данных или пилотного запуска.
+| Поле | Требуется |
+|------|-----------|
+| Имя отправителя | Да |
+| Имя получателя | Да |
+| Адрес или country/town (originator) | Да |
+| Дата рождения (originator) | Да |
+| Account number или unique transaction reference | Да |
 
-**Зачем:** FP-rate напрямую связан с cost-функцией (блок 7). Высокий FP-rate → высокий C_FP → threshold сдвигается вправо.
+**Ревизия Rec. 16 (июнь 2025):** уточнена ответственность в payment chain, стандартизированы требования, введено обязательство внедрять средства защиты от fraud/error, срок имплементации — конец 2030 г.
 
-### 11.5.2. Alert-to-SAR conversion
+**Пороги по юрисдикциям:**
 
-**Alert-to-SAR conversion** — доля алертов, которые приводят к подаче SAR (Suspicious Activity Report).
+| Юрисдикция | Порог |
+|------------|-------|
+| FATF default | USD/EUR 1 000 |
+| US FinCEN | USD 3 000 |
+| EU (TFR 2023/1113) | €0 (без порога) |
+| UK | £1 000 |
+| Canada | CAD 1 000 |
 
-**Как получаем:** feedback loop. Аналитик помечает, подан ли SAR по данному алерту.
+ЕС — outlier: нулевой порог для CASP-to-CASP, верификация self-hosted wallet при ≥ €1 000.
 
-**Baseline:** определяется из исторических данных.
+### 11.3.2. Соответствие Spillety
 
-**Зачем:** conversion rate показывает, насколько алерты **полезны** для compliance. Низкий conversion rate означает, что система генерирует шум.
-
-### 11.5.3. TTD (Time To Detection)
-
-**TTD** — время от первого on-chain сигнала до алерта.
-
-**Как получаем:** для каждого алерта фиксируется timestamp первого сигнала (например, первая транзакция с illicit-адресом) и timestamp алерта. TTD = разность.
-
-**Baseline:** определяется эмпирически на исторических данных.
-
-**Зачем:** TTD показывает, насколько быстро система реагирует на новые паттерны. Для novel sanctions TTD — ключевая метрика.
-
-### 11.5.4. Latency p99
-
-**Latency p99** — 99-й процентиль времени ответа системы.
-
-**Как получаем:** benchmark на production hardware. Замеряется время от запроса до ответа для 10,000+ запросов.
-
-**Baseline:** определяется SLA. Для Spillety — CPU-only, интерактивная latency.
-
-**Зачем:** latency критична для интеграции в real-time системы (биржи, платёжные шлюзы).
+Evidence JSON включает originator/beneficiary-поля для VASP-транзакций; off-chain данные — через VASP-интеграции (фаза 2). Проблема **Sunrise Issue** (контрагент в юрисдикции без имплементации Travel Rule) решается enhanced due diligence, запросом данных у клиента напрямую и ограничением активности с high-risk регионами.
 
 ---
 
-## 11.6. Метрики стоимости
+## 11.4. FinCEN SAR
 
-### 11.6.1. Labeling cost
+### 11.4.1. Режим подачи
 
-**Labeling cost** — стоимость верификации court documents и других источников разметки.
+- **Срок:** 30 календарных дней после initial detection; дополнительно 30 дней для идентификации suspect, но не более 60 дней суммарно.
+- **Порог:** $5 000 (банки), $2 000 (MSB).
+- **Триггеры:** средства от нелегальной деятельности; структурирование для обхода отчётности; отсутствие деловой/законной цели; содействие преступной деятельности.
+- **Continuing activity** (FAQ октябрь 2025): review каждые 90 дней, continuing SAR в течение 30 дней после review — суммарно 120 дней.
 
-**Как получаем:** стоимость часа аналитика × число часов на верификацию одного документа.
+### 11.4.2. Генерация SAR из Evidence JSON
 
-**Baseline:** у конкурентов — 30+ FTE на разметку. У Spillety — anchors бесплатны, labeling cost близок к нулю.
+| Поле SAR | Источник |
+|----------|----------|
+| Transaction hash | on-chain |
+| Blockchain | on-chain |
+| Timestamp | on-chain |
+| Sender / Receiver | on-chain |
+| Amount (crypto) | on-chain |
+| Amount (USD) | price oracle |
+| Causal path | Evidence JSON |
+| Anchor provenance | Evidence JSON |
+| Risk score | GBDT (калиброванный) |
 
-**Зачем:** labeling cost — ключевое конкурентное преимущество Spillety. Без ручной разметки экономика системы радикально лучше.
-
-### 11.6.2. FTE
-
-**FTE** — число сотрудников, эквивалентное полной занятости, необходимое для работы системы.
-
-**Как получаем:** power analysis + operational data. Для random sampling (блок 8) требуется определённое число наблюдений; для Tier 2 review — определённое число алертов в день.
-
-**Baseline:** у конкурентов — 100+ FTE. У Spillety — минимум.
-
-**Зачем:** FTE — ключевая метрика unit economics.
-
-### 11.6.3. Cost per alert
-
-**Cost per alert** — стоимость обработки одного алерта.
-
-**Формула:**
-
-\[
-\text{Cost per alert} = \frac{\text{FTE cost} + \text{infrastructure cost}}{\text{number of alerts}}
-\]
-
-**Как получаем:** operational data.
-
-**Baseline:** определяется из исторических данных.
+SAR не подаётся автоматически; обязателен human review аналитика.
 
 ---
 
-## 11.7. Метрики self-evolution
+## 11.5. 6AMLD
 
-### 11.7.1. Temporal validation
+6AMLD гармонизирует 22 predicate offences (включая cybercrime, environmental crime, tax crime), криминализует aiding/abetting/inciting/attempting, вводит ответственность юридических лиц и минимальный срок 4 года, требует dual criminality.
 
-**Temporal validation** — median distance на исторических парах anchor→anchor.
-
-**Как получаем:** для каждой пары anchors \((a_i, a_j)\), добавленных в разные моменты времени, вычисляется расстояние в embedding space. Медиана этого расстояния — temporal validation metric.
-
-**Интерпретация:** низкое значение означает, что embedding обобщает на новые anchors. Высокое — что embedding деградировал.
-
-**Порог:** распределение median distance на исторических парах; порог — квантиль, соответствующий стабильному embedding.
-
-### 11.7.2. Drift (KS)
-
-**Drift (KS)** — результат KS-теста на распределении embeddings.
-
-**Как получаем:** сравнение распределений embeddings на разных временных срезах. KS-статистика и p-value.
-
-**Интерпретация:** p-value < 0.05 означает значимый drift. Требуется retraining.
-
-**Мониторинг:** dashboard с KS-статистикой по времени.
-
-### 11.7.3. Recall@K на новых санкциях
-
-**Recall@K на новых санкциях** — доля новых санкций, для которых retrieval находит правильные anchors в top-K.
-
-**Как получаем:** для каждой новой санкции (добавленной после даты обучения) проверяется, попадает ли она в top-K для связанных кошельков.
-
-**Baseline:** определяется эмпирически.
-
-**Зачем:** эта метрика показывает, насколько система готова к novel sanctions.
+**Соответствие:** DAG учитывает predicate offence в приоритизации; метаданные anchor включают тип predicate offence (из судебных документов); признаки GBDT содержат `predicate_offence_severity`.
 
 ---
 
-## 11.8. Что НЕ обещаем
+## 11.6. Daubert court-admissibility
 
-| Обещание | Почему нет |
-|----------|-----------|
-| Абсолютные значения метрик без эмпирической базы | Метрики зависят от данных, base rate, определения illicit |
-| Precision = 1.0 | Невозможно при imbalanced классах и неполной разметке |
-| Recall = 1.0 | Невозможно: unknown-адреса могут быть illicit |
-| Zero FP | Невозможно: FP — неизбежная часть любой системы |
-| «Distance = causal» | Неверно: distance — корреляция в learned space |
-| Court-admissibility без Daubert | Требуется внешняя валидация (error rate, peer review) |
+### 11.6.1. Критерии
 
-**Почему это важно:** завышенные обещания подрывают доверие регулятора и инвесторов. Честные метрики с оговорками — основа для long-term работы.
+| Критерий | Проверка |
+|----------|----------|
+| Testability | Верифицируемость методологии |
+| Error rate | Известная частота ошибок |
+| Peer review | Внешняя проверка |
+| General acceptance | Принятие в relevant field |
 
----
+Фокус inquiry — принципы и методология, а не выводы.
 
-## 11.9. Power analysis для random sampling
+### 11.6.2. Соответствие Spillety
 
-### 11.9.1. Проблема
+| Критерий | Реализация |
+|----------|------------|
+| Testability | PR-AUC, Brier, ECE на held-out temporal split |
+| Error rate | Precision@K, Recall@K, FP-rate per analyst, bootstrap CI |
+| Peer review | Independent validation внешней командой |
+| General acceptance | Contrastive learning + GBDT — устоявшиеся методы |
 
-Random sampling из auto-clear (блок 8) требует определённого размера выборки для unbiased оценки precision/recall. Слишком маленькая выборка даёт широкий доверительный интервал; слишком большая — избыточна.
-
-### 11.9.2. Формула
-
-Для оценки precision с доверительным интервалом \(\pm e\) при уровне доверия \(1 - \alpha\):
-
-\[
-n = \frac{z_{1-\alpha/2}^2 \cdot p(1-p)}{e^2}
-\]
-
-где:
-- \(z_{1-\alpha/2}\) — квантиль нормального распределения (1.96 для 95% confidence)
-- \(p\) — ожидаемая precision
-- \(e\) — допустимая ошибка
-
-**Пример:** для precision \(p = 0.05\), ошибки \(e = 0.01\), confidence 95%:
-
-\[
-n = \frac{1.96^2 \cdot 0.05 \cdot 0.95}{0.01^2} \approx 1825
-\]
-
-**Как получаем \(p\):** из исторических данных или пилотного запуска.
-
-**Как получаем \(e\):** из требований к точности оценки.
-
-### 11.9.3. Применение в Spillety
-
-Размер random sampling определяется по power analysis. Например, для оценки precision auto-clear с \(\pm 5\%\) при 95% confidence требуется определённое число наблюдений. Это число пересчитывается ежемесячно на основе обновлённых данных.
+Без внешней Daubert-валидации заявление о court-admissibility недопустимо. Требуется adversarial testing (red team ежемесячно) на устойчивость к adversarial anchors.
 
 ---
 
-## 11.10. Визуализация
+## 11.7. Bias-аудит
 
-> Код для генерации всех графиков этого раздела вынесен в отдельный файл [`files/11_visualization.py`](./files/11_visualization.py). Ниже — только сами картинки и их смысл.
+### 11.7.1. Постановка
 
-![pr auc comparison](./files/11-10-1_pr_auc_comparison.png)
+Регуляторы (EBA, AI Act) требуют детекции и митигации нежелательного смещения. В FCP-домене риски: повышенный FP-rate для отдельных юрисдикций, country-contingent differential treatment, levelling down при попытке выравнивания precision.
 
-**PR-AUC comparison:** Сравнение PR-curve для baseline, GBDT и GBDT+calibration. PR-AUC указан в легенде. Base rate — горизонтальная линия.
+### 11.7.2. Метрики справедливости: выбор
 
-![calibration comparison](./files/11-10-2_calibration_comparison.png)
+| Метрика | Определение |
+|---------|-------------|
+| Demographic parity | Равенство positive rate across groups |
+| Equalized odds | Равенство TPR и FPR across groups |
+| Predictive parity | Равенство precision (PPV) across groups |
 
-**Calibration comparison:** Reliability diagram + ECE bar chart. Показывает, насколько хорошо модели калиброваны.
+**Выбор: demographic parity vs equalized odds vs predictive parity.** Метрики несовместимы одновременно; выбор зависит от контекста. Для юрисдикционного аудита Spillety приоритет — **equalized odds** (контроль TPR и FPR), поскольку регулятору критичны как пропуски, так и ложные срабатывания. Оценка — bootstrap CI по группам, проверка significance, отчёт по FP-rate и alert-to-SAR.
 
-![power analysis](./files/11-10-3_power_analysis.png)
+### 11.7.3. Jurisdiction-level fairness audit
 
-**Power analysis:** Зависимость требуемого размера выборки от ожидаемой precision. Позволяет определить размер random sampling.
+1. Стратификация алертов по юрисдикциям.
+2. Оценка precision, recall, FPR per group.
+3. Проверка equalized odds: близость TPR и FPR across jurisdictions с bootstrap CI.
+4. При значимой диспропорции — feature-level investigation.
 
-![drift monitoring](./files/11-10-4_drift_monitoring.png)
+Диспропорция может быть **justified** (концентрация OFAC-санкций) или **unjustified**; различие требует экспертизы и документации.
 
-**Drift monitoring:** KS-статистика по времени. Точки выше порога — сигнал для retraining.
+### 11.7.4. SHAP для детекции скрытого смещения
+
+Признак, коррелирующий с юрисдикцией (например, `news_co_mention_count`), может выступать прокси для sensitive attribute. SHAP-анализ выявляет такие признаки и направляет митигацию (регуляризация, исключение, перевзвешивание).
+
+### 11.7.5. Выбор и тестирование fairness-критерия
+
+Между demographic parity, equalized odds и predictive parity выбор обосновывается на тестах: bootstrap CI для диспропорции, recall@K per group, latency overhead при коррекции. Equalized odds выбран как основной для bias equalized odds в метрическом контуре.
 
 ---
+
+## 11.8. Архитектурные выборы и их проверка
+
+| Выбор | Альтернативы | Тесты |
+|-------|--------------|-------|
+| Подпись Evidence JSON | Ed25519 vs ECDSA | latency p99, bootstrap CI, audit verification |
+| Агрегация алертов | Merkle vs flat | Merkle proof size, верификация $O(\log N)$, bootstrap CI |
+| Калибровка скора (влияет на SAR-порог) | isotonic vs beta | ECE, Brier на hold-out, bootstrap CI |
+| Materiality | High vs Medium vs Low | SR 26-2 validation, TTD, recall@K, alert-to-SAR |
+| Fairness | demographic parity vs equalized odds vs predictive parity | bootstrap CI, FP-rate, recall@K, equalized odds |
+
+---
+
+## 11.9. Визуализация
+
+![materiality matrix](./files/10-8-1_materiality_matrix.png)
+
+**Materiality matrix:** exposure × purpose. Красная зона — high materiality (GBDT, encoder), зелёная — low (HNSW, правила).
+
+![fairness audit](./files/10-8-2_fairness_audit.png)
+
+**Fairness audit:** TPR, FPR, Precision по юрисдикциям; equalized odds требует близости TPR/FPR.
+
+![sar timeline](./files/10-8-3_sar_timeline.png)
+
+**SAR timeline:** detection → review → escalation → filing (30/60 дней) → continuing SAR (120 дней).
+
+---
+
+## 11.10. Метрический контур регуляторного соответствия
+
+> Теоретически мы оцениваем регуляторное соответствие вот так: PR-AUC, Precision@K, Recall@K, Brier, ECE, FP-rate, alert-to-SAR, TTD, latency p99, cost per alert, drift KS, audit verification, Merkle proof size, SR 26-2 validation, bias equalized odds.
+
+SR 26-2 validation измеряется как полнота conceptual soundness / outcomes analysis / ongoing monitoring; bias — equalized odds across jurisdictions; audit — верификация Ed25519+Merkle+OTS.
+
+---
+
 ## 11.11. Ограничения
 
-1. **Неполнота ground truth:** Elliptic++ содержит только частичную разметку illicit (unknown = 557k). Precision/recall — нижняя оценка реальных метрик.
-
-2. **Base rate dependency:** precision зависит от base rate. В разных популяциях (Bitcoin vs Ethereum, CEX vs DEX) base rate различается, и precision несравним без нормализации.
-
-3. **Temporal drift:** метрики, полученные на исторических данных, могут не отражать текущую производительность. Требуется периодический пересчёт.
-
-4. **Стоимость метрик:** некоторые метрики (TTD, alert-to-SAR) требуют operational data, которая собирается только после запуска в проде.
-
-5. **Power analysis assumptions:** формула для размера выборки предполагает нормальную аппроксимацию. При малых \(p\) и малых \(n\) требуется точный биномиальный расчёт.
-
-6. **Сравнение с конкурентами:** метрики конкурентов не публичны. Сравнение возможно только по косвенным данным (FTE, latency, cost).
+1. SR 26-2 — guidance, а не enforceable standard; non-compliance alone не влечёт criticism, но unsafe practices влекут action.
+2. Оценка materiality субъективна; критерии exposure/purpose определяются институтом.
+3. GenAI вне scope SR 26-2, но принципы governance применимы к LLM Explainer.
+4. FATF Rec. 16 имплементирован неравномерно; Sunrise Issue — операционный риск.
+5. FinCEN SAR дедлайны жёсткие; auto-block и TTD должны обеспечивать запас.
+6. 6AMLD dual criminality усложняет cross-jurisdiction приоритизацию.
+7. Daubert требует adversarial testing; без него court-admissibility под вопросом.
+8. Различение justified vs unjustified disparity при bias-аудите не формализовано.
+9. Метрики справедливости несовместимы одновременно.
 
 ---
 
-**Главная мысль:** Метрики Spillety делятся на пять групп: качество ранжирования, калибровка, операционные, стоимость, self-evolution. Каждая метрика имеет baseline и способ получения. Spillety не обещает абсолютных значений, precision=1.0, recall=1.0 или zero FP.
+**Резюме.** Регуляторное соответствие — условие эксплуатации. SR 26-2 задаёт классификацию и risk-based governance; FATF Rec. 16 — Travel Rule; FinCEN — сроки SAR; 6AMLD — predicate offences; Daubert — судебные критерии; bias-аудит — equalized odds. Формальная оценка соответствия включена в единый метрический контур.
 
-| Группа | Ключевые метрики | Как получаем |
-|--------|------------------|--------------|
-| Качество ранжирования | PR-AUC, Precision@K, Recall@K | Hold-out temporal split |
-| Калибровка | Brier, ECE | Reliability diagram |
-| Операционные | FP-rate, alert-to-SAR, TTD, latency p99 | Operational data, benchmark |
-| Стоимость | Labeling cost, FTE, cost per alert | Operational data, power analysis |
-| Self-evolution | Temporal validation, drift (KS), recall@K на новых санкциях | Мониторинг, temporal split |
+| Режим | Требование | Реализация Spillety |
+|-------|------------|---------------------|
+| SR 26-2 | Классификация, materiality, валидация | GBDT=model, encoder=model, retrieval=not model |
+| FATF Rec. 16 | Travel Rule data | Evidence JSON + VASP-интеграции |
+| FinCEN SAR | Своевременная подача | Авто-генерация + human review |
+| 6AMLD | Predicate offence classification | DAG + anchor metadata |
+| Daubert | Court-admissibility | Independent validation + adversarial testing |
+| Bias audit | Fairness | Jurisdiction-level audit + SHAP, equalized odds |
 
-**Практический вывод:**
-- PR-AUC чувствителен к base rate; precision при рабочем пороге — отдельная метрика.
-- Brier и ECE — взаимодополняющие метрики калибровки.
-- FP-rate на аналитика напрямую связан с cost-функцией.
-- Labeling cost и FTE — ключевые метрики unit economics.
-- Temporal validation и drift monitoring — основа self-evolution.
-- Random sampling требует power analysis для unbiased оценки.
-- Что НЕ обещаем: абсолютные значения без базы, precision=1.0, recall=1.0, zero FP, «distance = causal», court-admissibility без Daubert.
+**Практические выводы:**
+
+- SR 26-2 заменяет SR 11-7; governance — risk-based, materiality — явная.
+- Определение model сужено; rule-based инструменты могут не квалифицироваться, но подлежат FFIEC-тестированию.
+- FATF Rec. 16: стандартизированные требования; ЕС — нулевой порог.
+- FinCEN: 30 дней initial, 120 дней continuing.
+- 6AMLD: 22 predicate offences.
+- Daubert: testability, error rate, peer review, general acceptance.
+- Bias: equalized odds — базовый критерий; выбор между parity-видами обосновывается bootstrap CI и recall@K/latency.

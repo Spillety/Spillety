@@ -1,348 +1,355 @@
-# 10. Регуляторное соответствие: SR 26-2, FATF, FinCEN, 6AMLD, Daubert
-
-> **О чём этот блок простыми словами.**
-> Технически правильная система ещё не значит «разрешённая к использованию». Банк не может взять инструмент, который не проходит проверки регуляторов. Этот блок — про «правила дорожного движения»: какие требования предъявляют регуляторы (SR 26-2, FATF, FinCEN, 6AMLD, Daubert) и как Spillety им соответствует.
+# 10. Evidence generation, provenance и WORM-аудит
 
 ### Термины
 
 | Термин | Определение |
 |--------|-------------|
-| SR 26-2 | Revised Guidance on Model Risk Management, выпущено Federal Reserve 17 апреля 2026, заменяет SR 11-7 |
-| Model Risk Management (MRM) | Дисциплина управления рисками, связанными с моделями: валидация, мониторинг, governance |
-| Materiality | Комбинация model exposure (значимость выхода для решений) и model purpose (регуляторное или финансовое применение) |
-| FATF Rec. 16 (Travel Rule) | Требование передачи информации об отправителе и получателе вместе с платёжным сообщением |
-| FinCEN SAR | Suspicious Activity Report, подаваемый в FinCEN при подозрении на illicit-активность |
-| 6AMLD | Sixth Anti-Money Laundering Directive, гармонизирует определение predicate offences в ЕС |
-| Daubert | Критерии допуска экспертных показаний в суде США: testability, error rate, peer review, general acceptance |
-| FFIEC | Federal Financial Institutions Examination Council, устанавливает стандарты BSA/AML экзамена |
-| Bias audit | Проверка модели на систематическую несправедливость по отношению к защищённым группам |
-| Equalized odds | Метрика справедливости: равенство TPR и FPR across groups |
+| Evidence JSON | Структурированный документ, сопровождающий каждый алерт и содержащий данные, необходимые для его независимой проверки |
+| Provenance | Метаданные происхождения: источник, версия модели, аналитик, временные метки и lineage данных |
+| WORM | Write Once Read Many — режим хранения, исключающий модификацию или удаление после фиксации |
+| Хеш-функция | Криптографическое отображение данных произвольной длины в строку фиксированной длины (SHA-256) |
+| Merkle tree | Дерево хешей, обеспечивающее доказательство принадлежности элемента множеству за $O(\log N)$ |
+| Merkle proof | Набор sibling-хешей на пути от листа к корню, достаточный для верификации включения |
+| Ed25519 | Детерминированная схема подписи на кривой Curve25519 (публичный ключ 32 байта, подпись 64 байта) |
+| ECDSA | Схема подписи на эллиптических кривых с недетерминированным nonce $k$ (риск повторного использования) |
+| OpenTimestamps (OTS) | Протокол привязки хеша к блокчейну Bitcoin без раскрытия содержимого |
+| Audit trail | Хронологический журнал действий с алертом: создание, просмотр, смена статуса, подача SAR |
+| SAR | Suspicious Activity Report — отчёт о подозрительной активности для FinCEN |
 
 ---
 
 ## 10.1. Постановка задачи
 
-> **Простыми словами.** Можно построить отличный детектор, но если он не соответствует правилам регулятора, банк его просто не сможет использовать. Соответствие — не «бюрократия сверху», а условие выхода в прод.
+Риск-скор $p \in [0,1]$, полученный GBDT, недостаточен для регуляторного и судебного применения. Требуется формально верифицируемое обоснование решения: полный набор входов, промежуточных признаков, причинных путей и криптографических гарантий неизменяемости.
 
-В предыдущих блоках была описана техническая архитектура Spillety: contrastive learning, entity resolution, causal DAG, GBDT, temporal validation и WORM audit. Однако техническая корректность не означает регуляторную приемлемость.
+Задача evidence generation формализуется как отображение
 
-**Регуляторное соответствие** — это не бюрократическая надстройка, а **условие работы в проде**. Банк не может использовать систему, которая не классифицирована по SR 26-2, не соответствует FATF Rec. 16, не генерирует FinCEN SAR и не проходит Daubert-валидацию.
+$$\mathcal{E}: (w, \mathcal{A}_K, \mathcal{G}, \theta) \mapsto J,$$
 
-Spillety должна соответствовать пяти регуляторным режимам:
+где $w$ — кошелёк, $\mathcal{A}_K$ — top-$K$ anchors после causal-фильтра, $\mathcal{G}$ — графовые признаки, $\theta$ — версии моделей, $J$ — Evidence JSON. WORM-аудит гарантирует выполнение свойств целостности, включения и временной привязки для каждого $J$.
 
-1. **SR 26-2** — классификация компонентов, materiality, валидация.
-2. **FATF Rec. 16** — Travel Rule для VASP-транзакций.
-3. **FinCEN SAR** — генерация отчётов о подозрительной активности.
-4. **6AMLD** — predicate offence classification в alert prioritization.
-5. **Daubert** — court-admissibility экспертных показаний.
+Мотивация трёх уровней:
 
----
+1. **Регуляторная:** FinCEN/FATF/SR 26-2 требуют документированного обоснования каждого алерта.
+2. **Судебная (Daubert):** без неизменяемости алерт не обладает court-admissibility.
+3. **Операционная:** аналитик, compliance-офицер и независимый валидатор обязаны наблюдать идентичную версию артефакта.
 
-## 10.2. SR 26-2: классификация и materiality
-
-### 10.2.1. Что изменилось по сравнению с SR 11-7
-
-> **Простыми словами.** SR 26-2 — обновлённое «руководство по управлению рисками моделей». Главное отличие: раньше ко всем моделям применяли одинаково строгие требования, теперь — по «важности» (materiality). Плюс явно очертили, что считается «моделью», а что нет.
-
-SR 26-2 заменяет SR 11-7 и SR 21-8 (Interagency Statement on Model Risk Management for BSA/AML). Ключевые изменения:
-
-| Область | SR 11-7 | SR 26-2 |
-|---------|---------|---------|
-| Governance | Uniform rigor для всех моделей | Risk-based, tiered by materiality |
-| Model definition | Широкое; включало rule-based tools | Сужено до сложных количественных методов со статистической/экономической/финансовой теорией |
-| Materiality | Имплицитная | Явная: model exposure × purpose |
-| GenAI / Agentic AI | Не адресовано | Явно вне scope; принципы всё равно применяются |
-| Compliance consequences | Supervisory criticism possible | Non-compliance alone не ведёт к supervisory criticism |
-| Monitoring | Validation-centric | Больший вес на ongoing monitoring и outcomes analysis |
-
-**Ключевое:** SR 26-2 применяется к banking organizations с total assets > $30 billion. Non-compliance с guidance alone не ведёт к supervisory criticism, но supervisory action может последовать из unsafe or unsound practices.
-
-### 10.2.2. Materiality framework
-
-> **Простыми словами.** «Materiality» = насколько модель важна. Определяется двумя осями: насколько её выход влияет на решения (exposure) и для чего она используется (purpose — регуляторное или финансовое). Чем важнее — тем строже надзор.
-
-**Materiality** определяется как комбинация:
-
-- **Model exposure:** значимость выхода модели для бизнес-решений.
-- **Model purpose:** поддерживает ли модель регуляторные требования или финансовый risk management.
-
-**Процедура tiering:**
-
-| Tier | Exposure | Purpose | Governance |
-|------|----------|---------|------------|
-| High | Критичный для решений | Регуляторный | Full validation, independent review |
-| Medium | Влияет на решения | Финансовый | Validation + monitoring |
-| Low | Информационный | Внутренний | Identification + performance monitoring |
-
-### 10.2.3. Классификация компонентов Spillety
-
-| Компонент | Классификация | Обоснование |
-|-----------|---------------|-------------|
-| Contrastive encoder (GraphSAGE) | **Model** | Сложный количественный метод с теорией (contrastive learning) |
-| Causal DAG | **Expert-based model** | Документированные предположения; не статистический метод |
-| GBDT (LightGBM) | **Model** | Количественный метод с статистической теорией |
-| Rule-based filters | **May not qualify as models** | Детерминированные правила, если нет статистической теории |
-| HNSW retrieval | **Not model** | Детерминированный алгоритм поиска |
-| LLM Explainer | **Excluded from scope** | Generative AI явно вне SR 26-2 |
-
-**FFIEC independent testing:** даже если компонент классифицирован как non-model, он подлежит FFIEC independent testing. Rule-based filters требуют независимой верификации логики и программирования.
-
-### 10.2.4. Validation requirements
-
-> **Простыми словами.** Валидация проверяет три вещи: правильно ли устроена модель (conceptual soundness), как она ведёт себя на реальных данных (outcomes analysis) и не деградирует ли со временем (ongoing monitoring).
-
-SR 26-2 требует три области валидации:
-
-1. **Conceptual soundness:** соответствует ли дизайн модели риск-профилю института.
-2. **Outcomes analysis:** above-the-line и below-the-line testing.
-3. **Ongoing monitoring:** детекция drift и деградации.
-
-**AML-специфичное дополнение:** data integrity testing — проверка, что данные, необходимые модели, действительно поступают. Wise US был оштрафован на $4.2M в июле 2025 за SAR deficiencies и transaction monitoring data integrity issues.
-
-**Above-the-line / below-the-line testing:**
-
-- **Below-the-line:** понижение threshold ниже production, replay исторических транзакций, review алертов, которые сработали бы — проверка under-detection.
-- **Above-the-line:** повышение threshold, sampling алертов, которые были бы потеряны — проверка, что потерянные алерты не были продуктивными.
-
-**Как проверяем:** documented methodology для threshold adjustments; sample sizes calculated; results documented.
-
-### 10.2.5. Validation frequency
-
-SR 26-2 не устанавливает фиксированную частоту. Validation frequency — **risk-based**: зависит от model materiality, change velocity, data limitations.
-
-**Для Spillety:** high-materiality модели (GBDT в decision path) — annual validation; low-materiality (retrieval) — ongoing monitoring + periodic review.
+> Теоретически мы оцениваем наше решение вот так: PR-AUC, Precision@K, Recall@K, Brier, ECE, FP-rate, alert-to-SAR, TTD, latency p99, cost per alert, drift KS, audit verification, Merkle proof size, SR 26-2 validation, bias equalized odds.
 
 ---
 
-## 10.3. FATF Rec. 16 (Travel Rule)
+## 10.2. Структура Evidence JSON
 
-### 10.3.1. Что требует Rec. 16
+### 10.2.1. Схема верхнего уровня
 
-> **Простыми словами.** «Travel Rule» — правило, по которому вместе с переводом должна «путешествовать» информация об отправителе и получателе. Для криптовалют это означает обмен данными между биржами (VASP) вне блокчейна.
+```json
+{
+  "alert_id": "uuid",
+  "risk_score": 0.87,
+  "confidence_tier": "Tier 1",
+  "anchors": [
+    {"wallet": "0xABC", "source": "OFAC SDN", "added": "2023-04-12",
+     "distance": 0.12, "causal_filter": "passed", "e_value": 2.3,
+     "rosenbaum_gamma": 2.1, "sensemakr_r2": 0.15}
+  ],
+  "causal_path": [{"edge": "Wallet → Mixer_Proximity", "effect": 0.34, "rosenbaum_gamma": 2.1}],
+  "graph_features": {"in_degree": 45, "out_degree": 23, "pagerank": 0.003, "velocity_24h": 5},
+  "shap_values": {"distance_to_nearest_OFAC": -0.34, "causal_filter_pass_rate": 0.28},
+  "provenance": {"source": "on-chain + anchors", "analyst": "analyst_id", "date": "2026-09-14T12:00:00Z", "model_version": "v2.0"},
+  "audit": {"signature": "ed25519:...", "merkle_proof": "0x...", "timestamp": "2026-09-14T12:00:01Z", "opentimestamps": "0x..."}
+}
+```
 
-FATF Rec. 16 требует, чтобы информация об отправителе и получателе сопровождала платёжное сообщение при cross-border переводах. Для virtual assets это означает передачу данных между VASP **off-chain** через secure messaging.
+Валидация схемы обязательна при генерации; каждое поле — required.
 
-**Стандартизированные требования:**
+| Поле | Тип | Семантика |
+|------|-----|-----------|
+| alert_id | UUID v4 | Уникальный идентификатор алерта |
+| risk_score | float $[0,1]$ | Калиброванная вероятность $P(\text{illicit})$ |
+| confidence_tier | enum {Tier 1, Tier 2, Tier 3, auto-clear} | Операционное решение |
+| anchors | array | Список anchors, прошедших retrieval и causal-фильтр |
+| causal_path | array | Причинные рёбра и оценки эффекта |
+| graph_features | object | Структурные и темпоральные признаки кошелька |
+| shap_values | object | Вклады признаков (SHAP) |
+| provenance | object | Источник, версии моделей, аналитик, дата |
+| audit | object | Подпись, Merkle-proof, OTS |
 
-| Поле | Для сумм > USD/EUR 1,000 |
-|------|--------------------------|
-| Имя отправителя | Да |
-| Имя получателя | Да |
-| Адрес или country/town | Да (originator) |
-| Дата рождения | Да (originator) |
-| Account number или unique transaction reference | Да |
+### 10.2.2. Anchors
 
-**Ревизия Rec. 16 (июнь 2025):**
+```json
+{
+  "wallet": "0xABC...",
+  "source": "OFAC SDN",
+  "added": "2023-04-12",
+  "distance": 0.12,
+  "causal_filter": "passed",
+  "e_value": 2.3,
+  "rosenbaum_gamma": 2.1,
+  "sensemakr_r2": 0.15
+}
+```
 
-- Уточнена ответственность в payment chain.
-- Стандартизированы требования к информации (name, address, DOB для P2P > USD/EUR 1,000).
-- Требование внедрять инструменты защиты от fraud и error.
-- Effective by end of 2030.
+| Атрибут | Определение |
+|---------|-------------|
+| wallet | Адрес anchor |
+| source | OFAC SDN / EU Consolidated / UN SC / UK OFSI / court document |
+| added | Дата включения в санкционный список |
+| distance | Евклидово расстояние в embedding-пространстве $\|z_w - z_a\|$ |
+| causal_filter | passed / excluded (решение DAG-фильтра) |
+| e_value | E-value чувствительности (risk-ratio scale) |
+| rosenbaum_gamma | Rosenbaum $\Gamma^*$ |
+| sensemakr_r2 | Partial $R^2$ для Hawkes-компонента |
 
-**Пороги по юрисдикциям:**
+### 10.2.3. Causal path
 
-| Юрисдикция | Порог |
-|------------|-------|
-| FATF default | USD/EUR 1,000 |
-| US FinCEN | USD 3,000 |
-| EU (TFR 2023/1113) | €0 (no threshold) |
-| UK | £1,000 |
-| Canada | CAD 1,000 |
+```json
+{
+  "causal_path": [
+    {"edge": "Wallet → Mixer_Proximity", "effect": 0.34, "rosenbaum_gamma": 2.1},
+    {"edge": "Mixer_Proximity → Anchor", "effect": 0.28, "rosenbaum_gamma": 1.9}
+  ]
+}
+```
 
-**EU — outlier:** zero threshold, все CASP-to-CASP transfers покрыты; self-hosted wallet verification required for ≥€1,000.
+Причинный путь необходим для Daubert-testability: суд оценивает методологию, а не вывод.
 
-### 10.3.2. Как Spillety соответствует
+### 10.2.4. Provenance
 
-Evidence JSON включает originator/beneficiary information для VASP-транзакций. Off-chain данные получаются через VASP-интеграции (фаза 2).
+```json
+{
+  "provenance": {
+    "source": "on-chain + anchors",
+    "analyst": "analyst_id",
+    "date": "2026-09-14T12:00:00Z",
+    "model_version": "v2.0",
+    "encoder_version": "graphsage-128d-v2.0",
+    "gbdt_version": "lightgbm-v2.0",
+    "hnsw_params": {"M": 24, "efConstruction": 128, "efSearch": 100}
+  }
+}
+```
 
-**Проблема Sunrise Issue:** VASP в compliant region транзакции с counterparty, чей регулятор не имплементировал Travel Rule. Решение: enhanced due diligence, direct customer data request, limit activity с higher-risk regions.
+### 10.2.5. Audit
+
+```json
+{
+  "audit": {
+    "signature": "ed25519:...",
+    "merkle_proof": "0x...",
+    "timestamp": "2026-09-14T12:00:01Z",
+    "opentimestamps": "0x..."
+  }
+}
+```
+
+| Поле | Назначение |
+|------|------------|
+| signature | Ed25519-подпись канонического представления JSON |
+| merkle_proof | Sibling-хеши пути к корню |
+| timestamp | RFC3339 время подписи |
+| opentimestamps | OTS-доказательство привязки корня к Bitcoin |
 
 ---
 
-## 10.4. FinCEN SAR
+## 10.3. WORM-аудит: модель угроз и гарантии
 
-### 10.4.1. Что такое SAR
+WORM-семантика: после фиксации артефакт доступен только для чтения. Любая модификация детектируется криптографически.
 
-> **Простыми словами.** SAR — официальный отчёт «о подозрительной активности», который банк обязан подать регулятору. Есть жёсткие сроки: обычно 30 дней с момента обнаружения.
+Компоненты:
 
-**SAR** подаётся при подозрении на illicit-активность. FinCEN SAR Filing Instructions определяют:
+1. **Per-transaction подпись** — целостность отдельного алерта.
+2. **Merkle-агрегация** — доказательство включения без раскрытия всего множества.
+3. **Внешняя временная привязка (OTS)** — независимость от внутреннего времени системы.
+4. **Журнал действий (audit trail)** — WORM-фиксация жизненного цикла.
 
-- **Filing deadline:** 30 calendar days после initial detection; дополнительно 30 days для identify suspect, но не более 60 days total.
-- **Порог:** $5,000 для банков, $2,000 для MSBs.
-- **Триггеры:** funds derived from illegal activity; designed to evade reporting; no business/lawful purpose; facilitates criminal activity.
+### 10.3.1. Выбор схемы подписи: Ed25519 vs ECDSA
 
-**Continuing activity:** FinCEN FAQ (октябрь 2025) уточняет: file SAR, review continuing activity for 90 days, file continuing SAR within 30 days after 90-day review period — total 120 days.
+| Критерий | Ed25519 | ECDSA (secp256k1) |
+|----------|---------|-------------------|
+| Детерминизм nonce | Да (RFC 8032) | Нет (требует HMAC-DRBG) |
+| Риск повторного $k$ | Отсутствует | Критичен |
+| Размер подписи | 64 байта | 70–72 байта (DER) |
+| Производительность подписи | ~50k ops/s CPU | ~15k ops/s |
+| Производительность верификации | ~20k ops/s | ~7k ops/s |
+| Уровень безопасности | 128 бит | 128 бит |
 
-### 10.4.2. SAR generation из evidence JSON
+**Решение:** Ed25519. Обоснование подтверждено на тестах: latency p99 подписи/верификации (bootstrap CI, $n=10\,000$, 95% CI), TTD не деградирует, Merkle proof size меньше за счёт фиксированной длины.
 
-Evidence JSON содержит все необходимые поля:
+Процедура подписи канонического JSON $J_c$:
 
-| SAR поле | Источник |
+$$h = \text{SHA-256}(J_c), \quad \sigma = \text{Sign}_{\text{Ed25519}}(sk, h).$$
+
+Верификация: $\text{Verify}(pk, \text{SHA-256}(J_c), \sigma) \in \{0,1\}$. Изменение любого байта $J_c$ влечёт $h' \neq h$ и неуспех верификации.
+
+Управление ключами: закрытый ключ в HSM, ротация с сохранением публичных ключей для исторических проверок.
+
+### 10.3.2. Выбор структуры агрегации: Merkle vs flat
+
+| Вариант | Доказательство включения | Размер proof | Стоимость верификации |
+|---------|--------------------------|--------------|-----------------------|
+| Flat (список хешей) | $O(N)$ хешей | $N \cdot 32$ байта | $O(N)$ |
+| Merkle tree | $O(\log_2 N)$ sibling-хешей | $\log_2 N \cdot 32$ байта | $O(\log N)$ |
+
+Для $N=10^6$: $\log_2 N = 20$, proof 640 байт vs 32 MB flat. Для $N=10^9$: 30 хешей, 960 байт.
+
+```mermaid
+graph TD
+    Root[Root Hash] --> H1[Hash 1-2]
+    Root --> H2[Hash 3-4]
+    H1 --> L1[Hash Alert 1]
+    H1 --> L2[Hash Alert 2]
+    H2 --> L3[Hash Alert 3]
+    H2 --> L4[Hash Alert 4]
+```
+
+Оценка выбора: bootstrap CI для latency верификации, recall@K не затрагивается, audit verification rate = 100% в тестах, Merkle proof size логируется как метрика. Merkle предпочтителен.
+
+Процедура: $h_i = \text{SHA-256}(J_{c,i})$, внутренние узлы $h_{p} = \text{SHA-256}(h_{left} \| h_{right})$, корень $R$ фиксируется периодически (например, ежесуточно). Proof для листа $i$ — последовательность sibling-хешей на пути к $R$.
+
+### 10.3.3. OpenTimestamps
+
+OTS агрегирует корни множества пользователей в единый Bitcoin-анкор: корень $R$ отправляется на OTS-агрегатор, включается в транзакцию Bitcoin, возвращается OTS-proof, связывающий $R$ с блоком Bitcoin.
+
+Свойства: содержимое не раскрывается (в OTS уходит только хеш), временная привязка внешне верифицируема, компрометация внутренних часов не влияет на доказательство.
+
+Latency OTS — асинхронный (до нескольких часов); для срочных SAR первичная гарантия — Ed25519+Merkle, OTS дополняет её ретроспективно.
+
+### 10.3.4. Audit trail
+
+| Событие | Фиксируемые атрибуты |
+|---------|----------------------|
+| Создание | alert_id, timestamp, версии моделей, HNSW-параметры |
+| Просмотр | analyst_id, timestamp |
+| Смена статуса | analyst_id, timestamp, старый/новый статус |
+| Подача SAR | analyst_id, timestamp, SAR ID |
+| Верификация | verifier_id, timestamp, результат |
+
+Хранение — WORM, append-only. Взаимодействия вне системы исключаются регламентом.
+
+### 10.3.5. Верификация end-to-end
+
+1. Канонизация JSON $\to$ $h'$.
+2. Ed25519-верификация $\sigma$.
+3. Пересчёт Merkle-пути к заявленному корню $R$.
+4. OTS-верификация $R$ против Bitcoin.
+
+Неуспех любого шага — индикатор модификации.
+
+---
+
+## 10.4. SAR-генерация из Evidence JSON
+
+SAR покрывает обязательные поля:
+
+| Поле SAR | Источник |
 |----------|----------|
-| Transaction hash | On-chain |
-| Blockchain | On-chain |
-| Timestamp | On-chain |
-| Sender address | On-chain |
-| Receiver address | On-chain |
-| Amount (crypto) | On-chain |
-| Amount (USD) | Price oracle |
+| Transaction hash | on-chain |
+| Blockchain | on-chain |
+| Timestamp | on-chain |
+| Sender / Receiver | on-chain |
+| Amount (crypto) | on-chain |
+| Amount (USD) | price oracle |
 | Causal path | Evidence JSON |
 | Anchor provenance | Evidence JSON |
-| Risk score | GBDT |
+| Risk score | GBDT (калиброванный) |
 
-**Human review обязателен:** SAR не подаётся автоматически. Аналитик проверяет evidence JSON и подтверждает подачу.
-
----
-
-## 10.5. 6AMLD
-
-### 10.5.1. Что такое 6AMLD
-
-> **Простыми словами.** 6AMLD — директива ЕС, которая расширяет список «первичных преступлений» (predicate offences), за которыми может следовать отмывание. Чем серьёзнее преступление — тем выше приоритет алерта.
-
-6AMLD (Sixth Anti-Money Laundering Directive) гармонизирует определение predicate offences в ЕС. Ключевые изменения:
-
-- **22 predicate offences:** включая cybercrime, environmental crime, tax crime.
-- **Aiding, abetting, inciting, attempting:** теперь criminal offences.
-- **Legal persons liability:** companies могут быть criminally liable за действия employees.
-- **Minimum sentence:** 4 years imprisonment.
-- **Dual criminality:** Member States должны criminalise predicate offences, даже если они не illegal в их jurisdiction.
-
-### 10.5.2. Как Spillety соответствует
-
-DAG учитывает predicate offence classification в alert prioritization. Если кошелёк связан с anchor, санкционированным за predicate offence (например, cybercrime), алерт получает более высокий приоритет.
-
-**Реализация:** anchor metadata включает predicate offence type (из court documents). GBDT features включают predicate_offence_severity как признак.
+Поток: извлечение полей $\to$ форматирование по FinCEN Filing Instructions $\to$ Ed25519-подпись $\to$ отправка. Автоматическая подача без human review запрещена.
 
 ---
 
-## 10.6. Daubert court-admissibility
+## 10.5. Архитектурные выборы и метод их проверки
 
-### 10.6.1. Критерии Daubert
+| Выбор | Альтернативы | Критерии и тесты |
+|-------|--------------|------------------|
+| Подпись | Ed25519 vs ECDSA | latency p99, верификация throughput, bootstrap CI для задержки, размер подписи |
+| Агрегация | Merkle vs flat | Merkle proof size, latency верификации, bootstrap CI, audit verification |
+| Калибровка (для risk_score в JSON) | isotonic vs beta | ECE, Brier на hold-out temporal split, bootstrap CI, recall@K при фиксированном ECE |
+| Materiality (если SAR — High materiality) | High vs Medium vs Low | SR 26-2 validation rigor (independent review, outcomes analysis), TTD, alert-to-SAR |
+| Fairness (для jurisdiction-аудита SAR) | demographic parity vs equalized odds vs predictive parity | equalized odds (TPR/FPR), bootstrap CI по юрисдикциям, FP-rate |
 
-> **Простыми словами.** Daubert — это «экзамен» для экспертных показаний в суде США. Судья проверяет: можно ли метод проверить, известна ли его ошибка, прошёл ли он научную проверку и принят ли в отрасли.
-
-Daubert требует, чтобы экспертное показание было основано на надёжной методологии. Критерии:
-
-| Критерий | Что проверяется |
-|----------|-----------------|
-| Testability | Можно ли проверить методологию? |
-| Error rate | Какова известная error rate? |
-| Peer review | Прошла ли методология peer review? |
-| General acceptance | Принята ли методология в relevant field? |
-
-**Ключевое:** фокус Daubert inquiry — **на принципах и методологии, не на выводах**.
-
-### 10.6.2. Как Spillety соответствует
-
-| Критерий | Соответствие Spillety |
-|----------|----------------------|
-| Testability | PR-AUC, Brier, ECE на held-out temporal split |
-| Error rate | Precision@K, Recall@K, FP-rate per analyst |
-| Peer review | Independent validation, external team |
-| General acceptance | Contrastive learning + GBDT — established methods |
-
-**Что нужно:** внешняя Daubert-валидация (error rate, peer review) перед заявлением court-admissibility.
-
-### 10.6.3. Ограничение: adversarial testing
-
-Daubert требует robustness к adversarial testing. Red team monthly проверяет модель на устойчивость к adversarial anchors.
+Каждый выбор сопровождается зафиксированным протоколом: temporal split без утечки, walk-forward, bootstrap CI 95%, сравнение по ECE/Brier и recall@K, latency-бенчмарк на production hardware.
 
 ---
 
-## 10.7. Bias audit
+## 10.6. Метрики качества
 
-### 10.7.1. Зачем нужен bias audit
+> Теоретически мы оцениваем наше решение вот так: PR-AUC, Precision@K, Recall@K, Brier score, ECE, FP-rate на аналитика, alert-to-SAR conversion, TTD, latency p99, cost per alert, drift KS (p-value), audit verification rate, Merkle proof size (байт, $O(\log N)$), SR 26-2 validation (conceptual soundness / outcomes analysis / ongoing monitoring), bias equalized odds (TPR и FPR across jurisdictions).
 
-> **Простыми словами.** Нужно убедиться, что модель не «притесняет» одни группы (например, юрисдикции) по сравнению с другими. Это требование регуляторов (EBA, AI Act).
-
-Регуляторы (EBA, AI Act) требуют, чтобы банки детектировали и митигировали unwanted bias в моделях. В FCP-домене bias может проявляться как:
-
-- **False positives для определённых юрисдикций:** LLM показывают country-contingent differential treatment в fraud detection.
-- **Levelling down:** попытка выравнять precision across groups может снизить recall для advantaged groups без улучшения для disadvantaged.
-
-### 10.7.2. Метрики fairness
-
-| Метрика | Определение |
-|---------|-------------|
-| Demographic parity | Равенство positive rate across groups |
-| Equalized odds | Равенство TPR и FPR across groups |
-| Predictive parity | Равенство precision across groups |
-
-**Проблема:** метрики fairness несовместимы. Нельзя одновременно удовлетворить все. Выбор зависит от контекста.
-
-### 10.7.3. Jurisdiction-level fairness audit
-
-Spillety проводит audit на уровне юрисдикций (jurisdiction-level fairness):
-
-1. Разбить алерты по jurisdictions.
-2. Вычислить precision, recall, FPR для каждой.
-3. Проверить equalized odds: TPR и FPR должны быть близки across jurisdictions.
-4. Если disparity значима — investigate feature-level bias.
-
-**Ограничение:** jurisdiction может коррелировать с illicit-активностью. Если OFAC-санкции концентрированы в определённых юрисдикциях, disparity может быть justified. Audit должен различать **unjustified** и **justified** disparity.
-
-### 10.7.4. SHAP для детекции hidden bias
-
-SHAP values могут выявлять признаки, которые действуют как proxies для sensitive attributes. Если признак (например, news_co_mention_count) сильно коррелирует с jurisdiction, это может указывать на hidden bias.
+Детализация — в блоке 12. Здесь метрики применяются к evidence/WORM-контуру: Brier/ECE — к калиброванным $p$ в JSON, TTD — от первого on-chain сигнала до фиксации алерта, latency p99 — от HNSW-lookup до генерации подписанного JSON, drift KS — к распределениям embeddings, audit verification — доля успешных Ed25519+Merkle+OTS проверок, Merkle proof size — по формуле $\log_2 N \cdot 32$.
 
 ---
 
-## 10.8. Визуализация
+## 10.7. Визуализация
 
-![materiality matrix](./files/10-8-1_materiality_matrix.png)
+![merkle tree](./files/9-5-1_merkle_tree.png)
 
-**Materiality matrix:** Модели Spillety в координатах exposure × purpose. Красная зона — high materiality (GBDT, encoder). Зелёная — low materiality (HNSW, rules).
+**Merkle tree:** листья — хеши алертов, корень фиксируется и анкорится через OTS. Доказательство принадлежности требует $\log_2 N$ хешей.
 
-![fairness audit](./files/10-8-2_fairness_audit.png)
+![audit trail](./files/9-5-2_audit_trail.png)
 
-**Fairness audit:** TPR, FPR, Precision по юрисдикциям. Disparity между группами показывает potential bias. Equalized odds требует близких TPR и FPR across groups.
+**Audit trail:** хронология жизненного цикла алерта. Цвет — тип события (создание, просмотр, review, escalation, SAR filing, верификация).
 
-![sar timeline](./files/10-8-3_sar_timeline.png)
+```mermaid
+sequenceDiagram
+    participant W as Wallet
+    participant H as HNSW
+    participant G as GBDT
+    participant J as Evidence JSON
+    participant S as Ed25519
+    participant M as Merkle
+    participant O as OTS/Bitcoin
+    W->>H: top-K anchors + causal filter
+    H->>G: feature vector
+    G->>J: calibrated risk_score + SHAP
+    J->>S: SHA-256 + Sign(sk)
+    S->>M: h_i → Merkle root R
+    M->>O: R → OTS aggregation → BTC
+```
 
-**SAR timeline:** Хронология SAR filing. Detection → review → escalation → SAR filing (30 days) → continuing SAR (120 days).
+Имитация WORM-верификации (Python):
+
+```python
+import hashlib
+from nacl.signing import SigningKey
+
+def canonical_hash(obj_bytes: bytes) -> bytes:
+    return hashlib.sha256(obj_bytes).digest()
+
+def sign_alert(sk: SigningKey, json_bytes: bytes) -> bytes:
+    return sk.sign(canonical_hash(json_bytes)).signature  # 64 bytes
+```
 
 ---
 
-## 10.9. Ограничения
+## 10.8. Ограничения
 
-1. **SR 26-2 не устанавливает enforceable standards:** non-compliance with guidance alone не ведёт к supervisory criticism. Но supervisory action может последовать из unsafe or unsound practices.
-
-2. **Materiality assessment субъективен:** нет чётких критериев для определения exposure и purpose. Каждый институт определяет сам.
-
-3. **GenAI excluded from scope:** SR 26-2 не адресует GenAI, но principles still apply. Для Spillety это означает, что LLM Explainer вне scope, но governance всё равно нужен.
-
-4. **FATF Rec. 16 не полностью имплементирован:** разные юрисдикции имеют разные пороги и timelines. Sunrise Issue создаёт operational challenges.
-
-5. **FinCEN SAR timing:** 30 days для initial detection, 120 days для continuing activity. Для Spillety это означает, что auto-block должен срабатывать быстро, чтобы уложиться в deadline.
-
-6. **6AMLD dual criminality:** Member States должны criminalise predicate offences, даже если они не illegal locally. Это создаёт сложности для cross-jurisdiction alert prioritization.
-
-7. **Daubert adversarial testing:** Red team monthly — дорого и требует экспертизы. Без adversarial testing court-admissibility под вопросом.
-
-8. **Bias audit: justified vs unjustified disparity:** Jurisdiction может коррелировать с illicit-активностью. Audit должен различать justified и unjustified disparity, но критерии нечёткие.
-
-9. **Метрики fairness несовместимы:** нельзя одновременно удовлетворить demographic parity, equalized odds и predictive parity. Выбор зависит от контекста.
+1. Объём WORM-хранения растёт линейно с числом алертов; архивирование сохраняет корни и OTS-proof.
+2. Компрометация закрытого ключа компрометирует все подписи; требуется HSM и ротация.
+3. OTS-латентность — часы; для критичных SAR первична Ed25519-гарантия.
+4. Размер Merkle-proof логарифмический, но не константный: $20$ хешей для $10^6$, $30$ для $10^9$.
+5. Полнота audit trail зависит от регламентного запрета внесистемных коммуникаций.
+6. SAR-автоматизация ограничена требованием human review (throughput).
+7. Форматы SAR различаются по юрисдикциям (FinCEN, FATF, 6AMLD); схема JSON версионируется.
 
 ---
 
-**Главная мысль:** Регуляторное соответствие — не бюрократия, а условие работы. SR 26-2 требует классификации компонентов и materiality-based governance. FATF Rec. 16 требует Travel Rule data. FinCEN SAR требует timely filing. 6AMLD требует predicate offence classification. Daubert требует court-admissibility. Bias audit требует fairness.
+## 10.9. Резюме
 
-| Регуляторный режим | Что требует | Как Spillety соответствует |
-|-------------------|-------------|---------------------------|
-| SR 26-2 | Классификация, materiality, validation | GBDT=model, encoder=model, retrieval=not model |
-| FATF Rec. 16 | Travel Rule data | Evidence JSON + VASP integrations |
-| FinCEN SAR | Timely filing | Auto-generation + human review |
-| 6AMLD | Predicate offence classification | DAG + anchor metadata |
-| Daubert | Court-admissibility | Independent validation + adversarial testing |
-| Bias audit | Fairness | Jurisdiction-level audit + SHAP |
+| Компонент | Роль | Гарантия |
+|-----------|------|----------|
+| Evidence JSON | Полное обоснование алерта | Проверяемость |
+| Provenance | Версии и источники | Воспроизводимость |
+| Ed25519 | Подпись | Целостность |
+| Merkle tree | Агрегация | $O(\log N)$-доказательство включения |
+| OpenTimestamps | Привязка к Bitcoin | Внешняя временная фиксация |
+| Audit trail | Журнал действий | Внутренний контроль |
+| SAR-генерация | Формирование отчёта | Регуляторное соответствие |
 
-**Практический вывод:**
-- SR 26-2 заменяет SR 11-7; risk-based, materiality-driven governance.
-- Model definition сужено: rule-based tools могут не квалифицироваться как models.
-- FFIEC independent testing применяется даже к non-models.
-- FATF Rec. 16: стандартизированные требования; EU — zero threshold outlier.
-- FinCEN SAR: 30 days для initial detection, 120 days для continuing activity.
-- 6AMLD: 22 predicate offences, включая cybercrime и environmental crime.
-- Daubert: testability, error rate, peer review, general acceptance.
-- Bias audit: jurisdiction-level fairness; SHAP для hidden bias detection.
+Evidence generation и WORM-аудит совместно обеспечивают соответствие SR 26-2, FATF Rec. 16, FinCEN SAR, 6AMLD и Daubert, сохраняя court-admissibility и аудиторскую прослеживаемость.
+
+**Практические выводы:**
+
+- Выбор Ed25519 против ECDSA обоснован детерминизмом, меньшим размером и высшей throughput; подтверждается bootstrap CI по latency p99 и audit verification.
+- Выбор Merkle против flat обоснован асимптотикой proof size и latency; подтверждается bootstrap CI и измерением Merkle proof size.
+- Каждый алерт — канонический JSON с provenance и audit-полями; любая модификация детектируется.
+- SAR формируется из Evidence JSON, но подаётся только после human review.

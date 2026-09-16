@@ -10,7 +10,8 @@ Spillety - студенческий Know Your Transaction движок. Осно
 | [`docs/theory`](./docs/theory/) | Теория для погружения в проект |
 | [`docs/notebooks/`](./docs/notebooks/) | Notebooks с реализацией алгоритмов проекта поотдельности |
 
-> [!IMPORTANT] Jupyter notebooks: подготовка данных
+> [!IMPORTANT] 
+> Jupyter notebooks: подготовка данных
 > ```bash
 > make data        # распакует archive.zip → data/elliptic_raw/ (или скачает via kaggle)
 > make notebooks   # pip install -r docs/notebooks/requirements-notebooks.txt

@@ -4,7 +4,7 @@ from pathlib import Path
 SKILL = Path(".agents/skills/spillety/SKILL.md")
 START = "<!-- AUTO-GEN:START -->"
 END = "<!-- AUTO-GEN:END -->"
-PATTERNS = ["docs/*.md", "docs/notebooks/*.ipynb", "docs/theory/*.md", "spillety/**/*.py", ""]
+PATTERNS = ["docs/**/*.md", "docs/notebooks/*.ipynb"]
 MUST = ["README.md", "pyproject.toml"]
 EXCLUDE = {"node_modules", "__pycache__", ".git", ".venv", "venv", "dist", "build", "package-lock.json"}
 

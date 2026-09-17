@@ -10,3 +10,10 @@ repos:
         stages: [commit]
         pass_filenames: true
         verbose: true
+      - id: generate-skill-links
+        name: Generate SKILL links
+        entry: python scripts/gen_skill.py
+        language: python
+        pass_filenames: false
+        always_run: true
+        verbose: true

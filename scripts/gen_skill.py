@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Regenerate Links block in SKILL.md from actual repo files."""
 from pathlib import Path
 
 SKILL = Path(".agents/skills/spillety/SKILL.md")

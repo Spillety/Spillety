@@ -6,7 +6,6 @@ from scipy.stats import chi2_contingency, pearsonr
 
 
 def _has_hub(tid, hub_nodes):
-    """hub_nodes can be dict {txId: set(hub_neighbors)} or set of hub ids."""
     if isinstance(hub_nodes, dict):
         s = hub_nodes.get(int(tid), set())
         # dict values may be set or int flag

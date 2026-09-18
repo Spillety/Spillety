@@ -19,6 +19,7 @@ description: Навигация по проекту Spillety KYT для AI-аг�
 
 <!-- AUTO-GEN:START -->
 - `https://github.com/Spillety/Spillety/README.md`
+- `https://github.com/Spillety/Spillety/docs/architecture.md`
 - `https://github.com/Spillety/Spillety/docs/implementation.md`
 - `https://github.com/Spillety/Spillety/docs/notebooks/01_baseline_tabular.ipynb`
 - `https://github.com/Spillety/Spillety/docs/notebooks/02_ego_graph_features.ipynb`
@@ -45,4 +46,5 @@ description: Навигация по проекту Spillety KYT для AI-аг�
 - `https://github.com/Spillety/Spillety/docs/theory/10_evidence_generation_provenance_and_worm_audit.md`
 - `https://github.com/Spillety/Spillety/docs/theory/11_regulatory_compliance.md`
 - `https://github.com/Spillety/Spillety/docs/theory/12_metrics_and_quality.md`
+- `https://github.com/Spillety/Spillety/pyproject.toml`
 <!-- AUTO-GEN:END -->

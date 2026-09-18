@@ -2,8 +2,6 @@ from pathlib import Path
 
 import pandas as pd
 
-# ponytail: full 658M CSV in memory, upgrade to chunks/usecols if OOM; no schema/pandera validation
-
 
 def load_elliptic(root: Path | str = "data/elliptic_raw") -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
@@ -29,19 +27,13 @@ def load_elliptic(root: Path | str = "data/elliptic_raw") -> tuple[pd.DataFrame,
     if not root.exists():
         alt = Path("archive.zip")
         raise FileNotFoundError(f"Elliptic root not found: {root}. Expected 3 CSVs or {alt}")
-
-    # source CSV has no header: col 0=txId, col 1=time_step, cols 2..166=features
     features = pd.read_csv(root / "elliptic_txs_features.csv", header=None)
     n_cols = features.shape[1]
     features.columns = ["txId", "time_step"] + [f"feat_{i}" for i in range(2, n_cols)]
-
     classes = pd.read_csv(root / "elliptic_txs_classes.csv")
     edgelist = pd.read_csv(root / "elliptic_txs_edgelist.csv")
-
     features["time_step"] = features["time_step"].astype(int)
-    # inner keeps only txs present in both; guards against orphan txIds
     merged = features.merge(classes, on="txId", how="inner")
-
     return features, classes, edgelist, merged
 
 
@@ -65,7 +57,6 @@ def temporal_split(
     valid_end : int
         Inclusive upper bound for validation; rest goes to test.
     """
-    # copy avoids SettingWithCopyWarning on downstream mutation
     train = df[df[time_col] <= train_end].copy()
     valid = df[(df[time_col] > train_end) & (df[time_col] <= valid_end)].copy()
     test = df[df[time_col] > valid_end].copy()

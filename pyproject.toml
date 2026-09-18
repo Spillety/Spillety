@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spillety"
+version = "2.0.0"
+description = "Spillety — KYT engine for on-chain risk measurement"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Spillety Team"},
+]
+keywords = ["kyt", "aml", "blockchain", "risk", "on-chain"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "lightgbm>=4.0",
+    "scikit-learn>=1.3",
+    "scipy>=1.10",
+    "networkx>=3.0",
+    "shap>=0.44",
+]
+
+[project.optional-dependencies]
+hnsw = ["hnswlib>=0.8"]
+graphsage = ["torch>=2.0", "torch-geometric>=2.3"]
+all = ["lightgbm>=4.0", "hnswlib>=0.8", "torch>=2.0", "torch-geometric>=2.3"]
+
+[project.urls]
+Homepage = "https://github.com/Spillety/Spillety"
+Documentation = "https://github.com/Spillety/Spillety/tree/main/docs"
+Repository = "https://github.com/Spillety/Spillety.git"
+Issues = "https://github.com/Spillety/Spillety/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["spillety*"]
+exclude = ["tests*", "docs*", "demo*", "infra*"]
+
+[tool.setuptools.package-data]
+spillety = ["py.typed"]

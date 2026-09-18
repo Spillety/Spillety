@@ -1,8 +1,4 @@
-from spillety.metrics.dashboard import (
-    benchmark_latency,
-    compute_all_metrics,
-    expected_calibration_error,
-    precision_recall_at_k,
-)
+from spillety.metrics.dashboard import pr_auc_score, reliability_table
+from spillety.models.calibration import brier_score, ece_score
 
-__all__ = ["compute_all_metrics", "expected_calibration_error", "precision_recall_at_k", "benchmark_latency"]
+__all__ = ["brier_score", "ece_score", "pr_auc_score", "reliability_table"]

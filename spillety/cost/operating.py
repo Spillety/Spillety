@@ -1,186 +1,136 @@
 import numpy as np
-from sklearn.metrics import precision_recall_curve
+
+_TIERS = ("tier1", "tier2", "tier3", "clear")
 
 
-class OptimalThresholdResult(float):
-    """float tau* that also exposes cost diagnostics via mapping interface."""
-
-    def __new__(cls, tau, mapping):
-        obj = float.__new__(cls, tau)
-        obj._mapping = mapping
-        return obj
-
-    def __getitem__(self, key):
-        return self._mapping[key]
-
-    def __contains__(self, key):
-        return key in self._mapping
-
-    def keys(self):
-        return self._mapping.keys()
-
-    def get(self, key, default=None):
-        return self._mapping.get(key, default)
-
-    def __iter__(self):
-        return iter(self._mapping)
-
-    @property
-    def tau_star(self):
-        return float(self)
-
-    def to_dict(self):
-        return dict(self._mapping)
-
-
-def find_optimal_threshold(y_true, scores, C_FP=1, C_FN=10, budget=None):
+def cost_at(
+    y_true: np.ndarray,
+    scores: np.ndarray,
+    tau: float,
+    c_fp: float = 1.0,
+    c_fn: float = 10.0,
+) -> float:
     """
-    Cost-optimal threshold via PR curve.
+    ## Expected operating cost at threshold (§7.7.2)
 
-    Cost(tau) = C_FP*FP(tau) + C_FN*FN(tau), tau from precision_recall_curve.
-    Budget constrains Alerts(tau) <= B — without it optimum drifts to tau->0
-    when C_FN>>C_FP and queue explodes; budget forces feasible tradeoff.
+    Parameters
+    ----------
+    y_true : np.ndarray
+        Binary labels.
+    scores : np.ndarray
+        Calibrated probabilities.
+    tau : float
+        Alert threshold.
+    c_fp, c_fn : float
+        False-positive / false-negative unit costs.
+
+    Returns
+    ----------
+    float
+        Cost(τ) = C_FP·FP(τ) + C_FN·FN(τ).
     """
-    y_true = np.asarray(y_true)
-    scores = np.asarray(scores)
-
-    _, _, thresholds = precision_recall_curve(y_true, scores)
-    # precision_recall_curve returns thresholds len = len(prec)-1; finite thresholds only
-    if len(thresholds) == 0:
-        # degenerate: single threshold fallback
-        thresholds = np.array([0.5])
-
-    costs, fps, fns, alerts = [], [], [], []
-    for t in thresholds:
-        pred = (scores >= t).astype(int)
-        fp = int(((pred == 1) & (y_true == 0)).sum())
-        fn = int(((pred == 0) & (y_true == 1)).sum())
-        costs.append(C_FP * fp + C_FN * fn)
-        fps.append(fp)
-        fns.append(fn)
-        alerts.append(int((pred == 1).sum()))
-
-    costs = np.array(costs)
-    alerts = np.array(alerts)
-    thresholds = np.array(thresholds)
-
-    # feasible set under budget
-    if budget is not None:
-        # why budget: C_FN>>C_FP pushes tau* ->0 (alert everything) but analyst queue is finite
-        # Alerts(tau) <= B enforces operational feasibility even at higher Cost
-        feasible = alerts <= budget
-        if np.any(feasible):
-            idx = np.argmin(np.where(feasible, costs, np.inf))
-        else:
-            # no feasible tau -> minimal alerts (highest threshold) is least infeasible
-            idx = int(np.argmin(alerts))
-            # ponytail: alternative is quantile fallback (top-B alerts) but cost-based is preferred
-    else:
-        idx = int(np.argmin(costs))
-
-    tau_star = float(thresholds[idx])
-    mapping = {
-        "tau_star": tau_star,
-        "tau": tau_star,
-        "cost": float(costs[idx]),
-        "FP": int(fps[idx]),
-        "FN": int(fns[idx]),
-        "alerts": int(alerts[idx]),
-        "thresholds": thresholds,
-        "costs": costs,
-        "fps": np.array(fps),
-        "fns": np.array(fns),
-        "alerts_all": alerts,
-    }
-    return OptimalThresholdResult(tau_star, mapping)
-
-
-def tier_metrics(y_true, scores, tau, t_per_alert_h=0.25):
-    y_true = np.asarray(y_true)
-    scores = np.asarray(scores)
-    pred = (scores >= tau).astype(int)
-    tp = int(((pred == 1) & (y_true == 1)).sum())
+    y_true = np.asarray(y_true).astype(int)
+    pred = np.asarray(scores) >= tau
     fp = int(((pred == 1) & (y_true == 0)).sum())
     fn = int(((pred == 0) & (y_true == 1)).sum())
-    tn = int(((pred == 0) & (y_true == 0)).sum())
-    prec = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-    rec = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-    alerts = tp + fp
-    fte_h = alerts * t_per_alert_h
-    return {
-        "tau": float(tau),
-        "TP": tp,
-        "FP": fp,
-        "FN": fn,
-        "TN": tn,
-        "precision": float(prec),
-        "recall": float(rec),
-        "alerts": int(alerts),
-        "FTE_h": float(fte_h),
-        "FTE_days": float(fte_h / 8),
-    }
+    return float(c_fp * fp + c_fn * fn)
 
 
-def evaluate_tiers(y_true, scores, tiers, t_per_alert_h=0.25):
+def alerts_at(scores: np.ndarray, tau: float) -> int:
     """
-    tiers: dict name -> tau
-    returns DataFrame-like list of tier_metrics rows
+    ## Alert volume at threshold (§7.7.3)
+
+    Parameters
+    ----------
+    scores : np.ndarray
+        Calibrated probabilities.
+    tau : float
+        Alert threshold.
+
+    Returns
+    ----------
+    int
+        Alerts(τ) = |{i: score_i >= τ}|.
     """
-    rows = []
-    for name, tau in tiers.items():
-        m = tier_metrics(y_true, scores, tau, t_per_alert_h=t_per_alert_h)
-        m["tier"] = name
-        rows.append(m)
-    return rows
+    return int((np.asarray(scores) >= tau).sum())
 
 
-def power_analysis(p, e, z=1.96):
+def select_tau(
+    y_true: np.ndarray,
+    scores: np.ndarray,
+    c_fp: float = 1.0,
+    c_fn: float = 10.0,
+    budget: int | None = None,
+    taus: np.ndarray | None = None,
+) -> float:
     """
-    Sample size for proportion estimate: n = z^2 * p(1-p) / e^2
-    Random sampling from auto-clear pool is required for unbiased precision;
-    selective sampling inflates risk and cannot be extrapolated.
+    ## Cost-optimal threshold under analyst budget (§7.7.2–7.7.3)
+
+    Parameters
+    ----------
+    y_true : np.ndarray
+        Binary labels.
+    scores : np.ndarray
+        Calibrated probabilities.
+    c_fp, c_fn : float
+        Unit costs.
+    budget : int | None
+        Max alerts; None disables the constraint.
+    taus : np.ndarray | None
+        Candidate thresholds; defaults to sorted unique scores.
+
+    Returns
+    ----------
+    float
+        Feasible τ with minimum Cost; ties break toward fewer alerts.
     """
-    p = float(p)
-    e = float(e)
-    z = float(z)
-    if e == 0:
-        return float("inf")
-    # ponytail: exact Clopper-Pearson interval narrower for small p, here normal approximation
-    n = (z**2 * p * (1 - p)) / (e**2)
-    return float(n)
+    scores = np.asarray(scores, dtype=float)
+    cand = np.unique(scores) if taus is None else np.asarray(taus, dtype=float)
+    # Cost ties favor higher τ (fewer alerts); infeasible τ sorts after feasible.
+    best, best_cost, best_alerts = float(cand.max()), float("inf"), None
+    for tau in sorted(cand):
+        alerts = alerts_at(scores, float(tau))
+        if budget is not None and alerts > budget:
+            continue
+        cost = cost_at(y_true, scores, float(tau), c_fp, c_fn)
+        if cost < best_cost or (cost == best_cost and (best_alerts is None or alerts < best_alerts)):
+            best, best_cost, best_alerts = float(tau), cost, alerts
+    return best
 
 
-if __name__ == "__main__":
-    # synthetic cost curve — mirrors notebook 06 without elliptic data
-    np.random.seed(72)
-    n = 5000
-    y_true = (np.random.rand(n) < 0.1).astype(int)
-    # scores: illicit higher mean
-    scores = np.where(y_true == 1, np.random.beta(5, 2, n), np.random.beta(2, 5, n))
+def assign_tier(
+    score: float,
+    tau1: float,
+    tau2: float,
+    tau3: float,
+    causal_passed: bool,
+    e_value: float,
+    gamma: float,
+) -> str:
+    """
+    ## Route score to Tier 1/2/3 or auto-clear (§7.7.4)
 
-    for C_FN in [10, 100]:
-        res = find_optimal_threshold(y_true, scores, C_FP=1, C_FN=C_FN, budget=None)
-        print(f"C_FN={C_FN}: tau*={float(res):.4f} cost={res['cost']:.0f} alerts={res['alerts']} FP={res['FP']} FN={res['FN']}")
+    Parameters
+    ----------
+    score : float
+        Calibrated P(illicit).
+    tau1, tau2, tau3 : float
+        Blocking / manual-review / async-review thresholds.
+    causal_passed : bool
+        Upstream causal filter outcome.
+    e_value, gamma : float
+        Sensitivity metrics (E-value, Rosenbaum Γ*).
 
-    # budget constraint demo: B=500
-    res_b = find_optimal_threshold(y_true, scores, C_FP=1, C_FN=100, budget=500)
-    print(f"budget B=500: tau*={float(res_b):.4f} alerts={res_b['alerts']} (feasible={res_b['alerts']<=500})")
-
-    # tier metrics
-    tiers = {
-        "Tier 1 (C_FN=100)": float(find_optimal_threshold(y_true, scores, C_FP=1, C_FN=100)),
-        "Tier 2 (C_FN=10)": float(find_optimal_threshold(y_true, scores, C_FP=1, C_FN=10)),
-        "Tier 3 (0.10)": 0.10,
-    }
-    for name, tau in tiers.items():
-        m = tier_metrics(y_true, scores, tau)
-        print(f"{name} tau={tau:.4f} prec={m['precision']:.3f} rec={m['recall']:.3f} alerts={m['alerts']} FTE_h={m['FTE_h']:.1f}")
-
-    # quantile comparison (ponytail: quantile is circular — threshold drifts with score distribution)
-    q90 = float(np.quantile(scores, 0.90))
-    qm = tier_metrics(y_true, scores, q90)
-    print(f"Quantile 90% tau={q90:.4f} alerts={qm['alerts']} prec={qm['precision']:.3f}")
-
-    # power analysis
-    print(f"power n(p=0.05,e=0.01)={power_analysis(0.05, 0.01):.0f} (expected ~1825)")
-    print(f"power n(p=0.05,e=0.005)={power_analysis(0.05, 0.005):.0f}")
+    Returns
+    ----------
+    str
+        One of tier1 / tier2 / tier3 / clear.
+    """
+    # Tier 1 gate is conjunctive; scores above τ1 that fail it demote to tier2.
+    if score > tau1 and bool(causal_passed) and e_value > 2.0 and gamma > 1.5:
+        return "tier1"
+    if score > tau2:
+        return "tier2"
+    if score > tau3:
+        return "tier3"
+    return "clear"

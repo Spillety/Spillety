@@ -1,7 +1,40 @@
+import numpy as np
 import pandas as pd
+import pytest
 
+from spillety.features.build import build_feature_matrix
 from spillety.features.graph import add_graph_features, compute_graph_features
 from spillety.features.temporal import add_temporal_features, compute_temporal_features
+
+
+def test_build_feature_matrix_shape_names_and_validation():
+    rng = np.random.default_rng(72)
+    frames = {
+        "distances": rng.standard_normal((50, 4)),
+        "anchor_type_freqs": rng.standard_normal((50, 2)),
+        "anchor_min_dist": rng.standard_normal((50, 3)),
+        "sensitivity": rng.standard_normal((50, 4)),
+        "graph": rng.standard_normal((50, 3)),
+        "temporal": rng.standard_normal((50, 2)),
+        "context": rng.standard_normal((50, 2)),
+    }
+    x, names = build_feature_matrix(frames)
+    assert x.shape == (50, len(names))
+    assert len(names) == len(set(names))
+    assert names[:4] == ["d_1", "d_2", "d_3", "d_4"]
+    assert "dist_min" in names and "anchor_source_diversity" in names
+    assert "distance_to_nearest_OFAC" in names
+
+    x2, names2 = build_feature_matrix(frames)
+    assert names2 == names
+    assert np.array_equal(x, x2)
+
+    with pytest.raises(ValueError, match="distances"):
+        build_feature_matrix({"graph": rng.standard_normal((50, 2))})
+    bad = dict(frames)
+    bad["graph"] = rng.standard_normal((49, 3))
+    with pytest.raises(ValueError, match="n="):
+        build_feature_matrix(bad)
 
 
 def test_graph_features_shape_and_no_nan():

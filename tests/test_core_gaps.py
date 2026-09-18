@@ -1,4 +1,4 @@
-"""H1 unit gaps of the current core (seed 72 everywhere)."""
+"""## H1 unit gaps of the current core (seed 72 everywhere)."""
 
 from itertools import pairwise
 

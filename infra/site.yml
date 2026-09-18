@@ -1,0 +1,22 @@
+- name: Spillety data platform on k3s
+  hosts: kyt
+  become: true
+  gather_facts: false
+  roles:
+    - role: host_base
+      tags: [base]
+      vars: {ansible_python_interpreter: /usr/bin/python3}
+    - role: k3s
+      tags: [k3s]
+    - role: minio
+      tags: [minio]
+    - role: mysql
+      tags: [mysql]
+    - role: hive_metastore
+      tags: [metastore]
+    - role: spark
+      tags: [spark]
+    - role: cassandra
+      tags: [cassandra]
+    - role: smoke
+      tags: [smoke]

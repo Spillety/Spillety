@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: metastore-site
+  namespace: {{ ns_data }}
+data:
+  metastore-site.xml: |
+{{ lookup('template', 'metastore-site.xml.j2') | indent(4, first=True) }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hive-metastore
+  namespace: {{ ns_data }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: hive-metastore}
+  template:
+    metadata:
+      labels: {app: hive-metastore}
+    spec:
+      initContainers:
+        - name: fetch-mysql-driver
+          image: curlimages/curl:8.10.1
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              test -f /opt/auxlib/mysql-connector-j-8.0.33.jar \
+                || curl -sfL -o /opt/auxlib/mysql-connector-j-8.0.33.jar \
+                  https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar
+          volumeMounts:
+            - {name: auxlib, mountPath: /opt/auxlib}
+        - name: init-schema
+          image: {{ hive_image }}
+          env:
+            - {name: HIVE_AUX_JARS_PATH, value: /opt/auxlib/mysql-connector-j-8.0.33.jar}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              schematool -dbType mysql -info 2>/dev/null \
+                || schematool -dbType mysql -initSchema
+          volumeMounts:
+            - {name: conf, mountPath: /opt/hive/conf/metastore-site.xml, subPath: metastore-site.xml}
+            - {name: auxlib, mountPath: /opt/auxlib}
+      containers:
+        - name: metastore
+          image: {{ hive_image }}
+          command: ["/opt/hive/bin/hive"]
+          args: ["--service", "metastore"]
+          env:
+            - {name: HIVE_AUX_JARS_PATH, value: /opt/auxlib/mysql-connector-j-8.0.33.jar}
+            - {name: METASTORE_PORT, value: "9083"}
+          ports:
+            - {containerPort: 9083}
+          volumeMounts:
+            - {name: conf, mountPath: /opt/hive/conf/metastore-site.xml, subPath: metastore-site.xml}
+            - {name: auxlib, mountPath: /opt/auxlib}
+      volumes:
+        - name: conf
+          configMap: {name: metastore-site}
+        - name: auxlib
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metastore
+  namespace: {{ ns_data }}
+spec:
+  selector: {app: hive-metastore}
+  ports:
+    - {port: 9083, targetPort: 9083}

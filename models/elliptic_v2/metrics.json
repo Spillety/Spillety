@@ -1,0 +1,37 @@
+{
+  "test": {
+    "name": "B:refit-train+sel",
+    "pr_auc_raw": 0.6489172572146519,
+    "pr_auc_cal": 0.6317444129500266,
+    "roc_auc_cal": 0.8637317935820987,
+    "brier_raw": 0.026380232771946906,
+    "brier_cal": 0.025123058751386276,
+    "ece_raw": 0.026318045980808447,
+    "ece_cal": 0.009656681441877878,
+    "calibrator": "isotonic"
+  },
+  "ablation": [
+    {
+      "name": "A:v1-protocol+new feats",
+      "pr_auc_raw": 0.5641835426793331,
+      "pr_auc_cal": 0.5498073467720885,
+      "roc_auc_cal": 0.8088080729088826,
+      "brier_raw": 0.052541859741703896,
+      "brier_cal": 0.034116401873709554,
+      "ece_raw": 0.0525418379327312,
+      "ece_cal": 0.01989692650084292,
+      "calibrator": "isotonic"
+    },
+    {
+      "name": "B:refit-train+sel",
+      "pr_auc_raw": 0.6489172572146519,
+      "pr_auc_cal": 0.6317444129500266,
+      "roc_auc_cal": 0.8637317935820987,
+      "brier_raw": 0.026380232771946906,
+      "brier_cal": 0.025123058751386276,
+      "ece_raw": 0.026318045980808447,
+      "ece_cal": 0.009656681441877878,
+      "calibrator": "isotonic"
+    }
+  ]
+}

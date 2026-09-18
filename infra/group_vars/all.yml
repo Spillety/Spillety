@@ -1,0 +1,33 @@
+kubeconfig_path: /etc/rancher/k3s/k3s.yaml
+ansible_python_interpreter: /opt/ansible-venv/bin/python
+k3s_channel: stable
+
+ns_data: data
+ns_spark_operator: spark-operator
+ns_spark: spark
+
+minio_image: "quay.io/minio/minio:latest"
+minio_mc_image: "quay.io/minio/mc:latest"
+minio_root_user: minioadmin
+minio_root_password: minioadmin-change-me
+minio_storage_size: 50Gi
+iceberg_buckets:
+  - iceberg-warehouse
+  - spark-events
+
+mysql_image: "mysql:8.0"
+mysql_storage_size: 10Gi
+metastore_db: metastore
+metastore_db_user: hive
+metastore_db_password: hive-change-me
+mysql_root_password: root-change-me
+
+hive_image: "apache/hive:4.0.0"
+
+spark_operator_chart: kubeflow/spark-operator
+spark_operator_chart_version: "2.0.0"
+spark_job_image: "tabulario/spark-iceberg:latest"
+
+cassandra_image: "cassandra:4.1"
+cassandra_storage_size: 20Gi
+cassandra_heap: 1G

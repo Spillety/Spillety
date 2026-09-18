@@ -1,0 +1,41 @@
+{
+  "seed": 72,
+  "n_nodes_clustered": 203769,
+  "n_edges": 234355,
+  "n_clusters": 49,
+  "size_min": 1089,
+  "size_median": 4291.0,
+  "size_mean": 4158.551020408163,
+  "size_max": 7880,
+  "n_singletons": 0,
+  "cluster_precision_unweighted": 0.0,
+  "cluster_precision_weighted": 0.0,
+  "n_scored_clusters": 49,
+  "n_pure_clusters": 0,
+  "n_pairs": 50000,
+  "n_pairs_train": 27047,
+  "n_pairs_valid": 22953,
+  "prior_train": 0.8190926905017192,
+  "fusion_pr_auc": {
+    "logistic": 0.8869936832317762,
+    "clayton": 0.8667796249474262,
+    "gumbel": 0.8659741969980744,
+    "frank": 0.8668464665012847
+  },
+  "fusion_ece": {
+    "logistic": 0.05809575406858447,
+    "clayton": 0.04772210494985574,
+    "gumbel": 0.04772210494985574,
+    "frank": 0.04772210494985574
+  },
+  "fusion_brier": {
+    "logistic": 0.11849362553521739,
+    "clayton": 0.1177243051386643,
+    "gumbel": 0.1177243051386643,
+    "frank": 0.1177243051386643
+  },
+  "fusion_best": "logistic",
+  "assumption": "edgelist edge (txId1->txId2) is treated as one co-spending transaction [txId1, txId2], i.e. address\u2248txId; clusters = transitive closure (connected components) of this CIOH proxy. Clustering is unsupervised, so no temporal leakage into cluster precision; fusion uses a temporal split (train max(step)<= 35, valid above).",
+  "elapsed_s": 5.8,
+  "clusters_parquet_mb": 1.34
+}

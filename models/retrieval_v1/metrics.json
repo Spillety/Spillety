@@ -1,0 +1,40 @@
+{
+  "seed": 72,
+  "n_labeled": 46564,
+  "dim": 32,
+  "pca": {
+    "n_components": 32,
+    "fit": "train steps<=30 only"
+  },
+  "hnsw": {
+    "m": 24,
+    "ef_construction": 128,
+    "ef_search": 100
+  },
+  "queries": {
+    "n": 1000,
+    "k": 10
+  },
+  "recall_at_10": 0.995,
+  "latency_ms": {
+    "p50": 0.038437501643784344,
+    "p99": 0.09706117794848977,
+    "mean": 0.0423922389454674
+  },
+  "build_s": 0.5768816659983713,
+  "footprint": {
+    "raw_bytes": 5960192,
+    "index_bytes": 15856000,
+    "pq_bytes": 745024,
+    "pq_ratio": 8.0
+  },
+  "pq": {
+    "m": 16,
+    "recall_at_10": 0.8513,
+    "agreement_top10": 0.8513,
+    "pr_auc_assumption": "drop assumed 0.0 (no retraining in J3)",
+    "should_use_pq_conditional": false,
+    "recommendation": "keep float32"
+  },
+  "index_file": "data/derived/hnsw_v1.bin"
+}

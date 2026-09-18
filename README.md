@@ -37,3 +37,25 @@ Notebooks читают elliptic датасет через единый [`docs/no
 make data        # распакует archive.zip в папку data/elliptic_raw/ (или скачает из kaggle)
 make notebooks   # pip install -r docs/notebooks/requirements-notebooks.txt
 ```
+
+# Метрики
+
+| Метрика | Конкуренты | Spillety | Потолок теории |
+|---|---|---|---|
+| PR-AUC | не публикуется | 0.655 | ~0.80 (GraphSAGE + OFAC-якоря + свежие метки) |
+| F1 illicit | 0.705 — Skip-GCN, Weber et al. 2019 при темпоральном сплите; 0.93+ в поздних статьях, но без темпорального сплита | 0.698 | ~0.80 (там же + ретрейн по дрейф-гейту) |
+| Precision / Recall | 0.812 / 0.623 — Skip-GCN, там же | 0.939 / 0.555 на best-F1 (τ=0.576, 310 алертов); рабочие точки ниже | зависят от цены ошибок, а не от модели |
+| ROC-AUC | не публикуется | 0.879 | — |
+| Brier | не публикуется | 0.024 (тривиальный 0.050) | <0.02 |
+| ECE | не публикуется | 0.011 | <0.01 |
+| precision@100 / @500 | не публикуется | 1.00 / 0.62 | — |
+
+Chainalysis и TRM скоров не публикуют, так что судить о них можно только косвенно — по покрытию сетей и скорости ответа. Сравнивать есть смысл только с теми, у кого цифры открыты. Тут нужна оговорка: у Weber сплит 70:30 (первые 34 шага / последние 15), у нас тест — только последние 9 шагов, и доля illicit в нём другая. Это строже. Детали и walk-forward — в models/elliptic_v3/README.md.
+
+![PR curve](./docs/img/pr_curve.png)
+
+![Reliability](./docs/img/reliability.png)
+
+![Walk-forward](./docs/img/walkforward.png)
+
+![Metrics bars](./docs/img/metrics_bars.png)

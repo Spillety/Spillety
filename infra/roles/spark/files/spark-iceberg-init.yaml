@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: iceberg-init-sql
+  namespace: {{ ns_spark }}
+data:
+  init.sql: |
+    CREATE NAMESPACE IF NOT EXISTS iceberg.kyt;
+    CREATE TABLE IF NOT EXISTS iceberg.kyt.txs (
+      tx_id STRING, ts BIGINT, label STRING
+    ) USING iceberg;
+---
+apiVersion: sparkoperator.k8s.io/v1beta2
+kind: SparkApplication
+metadata:
+  name: iceberg-init
+  namespace: {{ ns_spark }}
+spec:
+  type: SQL
+  mode: cluster
+  image: {{ spark_job_image }}
+  imagePullPolicy: IfNotPresent
+  mainApplicationFile: /opt/sql/init.sql
+  sparkVersion: 3.5.0
+  restartPolicy: {type: Never}
+  volumes:
+    - name: sql
+      configMap: {name: iceberg-init-sql}
+  driver:
+    cores: 1
+    memory: 1g
+    serviceAccount: spark
+    volumeMounts:
+      - {name: sql, mountPath: /opt/sql}
+  executor:
+    cores: 1
+    instances: 1
+    memory: 2g
+  sparkConf:
+    spark.sql.catalog.iceberg: org.apache.iceberg.spark.SparkCatalog
+    spark.sql.catalog.iceberg.type: hive
+    spark.sql.catalog.iceberg.uri: thrift://metastore.{{ ns_data }}:9083
+    spark.sql.catalog.iceberg.warehouse: s3a://iceberg-warehouse/
+    spark.hadoop.fs.s3a.endpoint: http://minio.{{ ns_data }}:9000
+    spark.hadoop.fs.s3a.access.key: {{ minio_root_user }}
+    spark.hadoop.fs.s3a.secret.key: {{ minio_root_password }}
+    spark.hadoop.fs.s3a.path.style.access: "true"

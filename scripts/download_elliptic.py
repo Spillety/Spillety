@@ -14,10 +14,10 @@ Behavior:
            -> unzip -> data/elliptic_raw/
     Never modifies data/elliptic_raw/ if already valid.
 """
-from pathlib import Path
 import subprocess
 import sys
 import zipfile
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data" / "elliptic_raw"
@@ -52,7 +52,7 @@ def from_kaggle() -> bool:
             check=True,
         )
         return has_data()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — любой сбой kaggle = fallback на прямую ссылку
         print(f"  kaggle failed: {e}")
         return False
 

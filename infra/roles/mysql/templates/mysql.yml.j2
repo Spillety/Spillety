@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-creds
+  namespace: {{ ns_data }}
+type: Opaque
+stringData:
+  root-password: {{ mysql_root_password }}
+  metastore-password: {{ metastore_db_password }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  namespace: {{ ns_data }}
+spec:
+  serviceName: mysql
+  replicas: 1
+  selector:
+    matchLabels: {app: mysql}
+  template:
+    metadata:
+      labels: {app: mysql}
+    spec:
+      containers:
+        - name: mysql
+          image: {{ mysql_image }}
+          env:
+            - {name: MYSQL_ROOT_PASSWORD, valueFrom: {secretKeyRef: {name: mysql-creds, key: root-password}}}
+            - {name: MYSQL_DATABASE, value: {{ metastore_db | quote }}}
+            - {name: MYSQL_USER, value: {{ metastore_db_user | quote }}}
+            - {name: MYSQL_PASSWORD, valueFrom: {secretKeyRef: {name: mysql-creds, key: metastore-password}}}
+          ports:
+            - {containerPort: 3306}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/mysql}
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests: {storage: {{ mysql_storage_size }}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: {{ ns_data }}
+spec:
+  selector: {app: mysql}
+  ports:
+    - {port: 3306, targetPort: 3306}

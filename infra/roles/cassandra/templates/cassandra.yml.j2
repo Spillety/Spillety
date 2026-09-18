@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cassandra
+  namespace: {{ ns_data }}
+  labels: {app: cassandra}
+spec:
+  clusterIP: None
+  selector: {app: cassandra}
+  ports:
+    - {name: cql, port: 9042, targetPort: 9042}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cassandra
+  namespace: {{ ns_data }}
+spec:
+  serviceName: cassandra
+  replicas: 1
+  selector:
+    matchLabels: {app: cassandra}
+  template:
+    metadata:
+      labels: {app: cassandra}
+    spec:
+      containers:
+        - name: cassandra
+          image: {{ cassandra_image }}
+          env:
+            - {name: MAX_HEAP_SIZE, value: {{ cassandra_heap }}}
+            - {name: HEAP_NEWSIZE, value: 256M}
+            - {name: CASSANDRA_SEEDS, value: "cassandra-0.cassandra.{{ ns_data }}.svc.cluster.local"}
+            - {name: CASSANDRA_CLUSTER_NAME, value: spillety}
+          ports:
+            - {containerPort: 9042}
+            - {containerPort: 7000}
+          readinessProbe:
+            exec:
+              command: ["nodetool", "status"]
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 15
+            failureThreshold: 5
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests: {storage: {{ cassandra_storage_size }}}

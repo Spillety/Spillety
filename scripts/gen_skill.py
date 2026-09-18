@@ -4,8 +4,8 @@ from pathlib import Path
 SKILL = Path(".agents/skills/spillety/SKILL.md")
 START = "<!-- AUTO-GEN:START -->"
 END = "<!-- AUTO-GEN:END -->"
-PATTERNS = ["docs/**/*.md", "spillety/**/*.py", "infra/**/*", "demo/**/*", "scripts/*.py", "tests/*.py", "pyproject.toml", "CITATION.cff"]
-MUST = ["README.md", "temp.md", "docs/architecture.md"]
+PATTERNS = ["docs/**/*.md", "docs/notebooks/*.ipynb"]
+MUST = ["README.md", "pyproject.toml"]
 EXCLUDE = {"node_modules", "__pycache__", ".git", ".venv", "venv", "dist", "build", "package-lock.json"}
 
 
@@ -28,7 +28,7 @@ def collect():
 def build_block(paths):
     if not paths:
         return f"{START}\n<!-- no files -->\n{END}"
-    return "\n".join([START] + [f"- `{p}`" for p in paths] + [END])
+    return "\n".join([START] + [f"- `https://github.com/Spillety/Spillety/{p}`" for p in paths] + [END])
 
 
 def main():

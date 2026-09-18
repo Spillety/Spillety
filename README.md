@@ -20,6 +20,7 @@ _Столбец "Общепринятый подход" является при�
 
 | Раздел | Роль |
 | ------ | ---- |
+| [`.agent/skills/spillety/SKILL.md`](https://github.com/Spillety/Spillety/blob/main/.agents/skills/spillety/SKILL.md) | SKILL файл для ознакомления с проектом |
 | [`docs/`](./docs/) | Документация | 
 | [`docs/theory`](./docs/theory/) | Теория для погружения в проект |
 | [`docs/notebooks/`](./docs/notebooks/) | Notebooks с реализацией алгоритмов проекта по отдельности |
@@ -30,7 +31,7 @@ _Столбец "Общепринятый подход" является при�
 
 ### Подготовка данных
 
-Notebooks читают elliptic датасет через единый `docs/notebooks/_elliptic_loader.py`. Чтобы скачать датасет, выполните команды ниже:
+Notebooks читают elliptic датасет через единый [`docs/notebooks/_elliptic_loader.py`](./docs/notebooks/_elliptic_loader.py). Чтобы скачать датасет, выполните команды ниже:
 
 ```bash
 make data        # распакует archive.zip в папку data/elliptic_raw/ (или скачает из kaggle)

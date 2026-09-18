@@ -222,4 +222,4 @@ TASKS
 temp.md
 *.zip
 data/elliptic_raw/
-node_modules
+node_modules/

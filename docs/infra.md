@@ -1,52 +1,70 @@
-# Инфраструктура Spillety (k3s, один хост)
+# Инфраструктура стенда
 
-Живой стенд: `ubuntu@51.250.24.23` (Ubuntu 24.04, 8 CPU, 31 ГБ RAM), k3s `v1.36.4+k3s1`, single-node. Код развёртки — `infra/` (Ansible), план и решения — `TASKS/infra-ansible/`.
+Стенд собран нарочно скупо: один хост под Ubuntu 24.04 с восемью CPU и тридцатью одним гигабайтом памяти,
+поверх — одномодовый k3s v1.36.4+k3s1.
+Причина прозаична: пока нужна не отказоустойчивость, а воспроизводимое озеро,
+куда Spark пишет Iceberg-таблицы, а metastore отвечает по thrift.
+Один узел убирает целый класс проблем с сетью и кворумами.
+Ценой мы жертвуем очевидно: падение хоста роняет всё сразу, и горизонтально тут ничего не масштабируется.
 
-## Состав
+Весь код развёртки живёт в `infra/` как Ansible-плейбук из восьми ролей от `host_base` до `smoke`,
+а история решений — в `TASKS/infra-ansible/`.
+Сделано это затем, чтобы стенд накатывался заново,
+а дрейф конфигурации был виден в git, а не в голове дежурного.
 
-| Компонент | Где | Назначение |
-|---|---|---|
-| MinIO | `data`, :9000/:9001 | S3-совместимое озеро; бакеты `iceberg-warehouse`, `spark-events` |
-| MySQL 8 | `data`, :3306 | backend Hive metastore (БД `metastore`) |
-| Hive metastore 4.0.0 | `data`, :9083 thrift | каталог Iceberg-таблиц, warehouse `s3a://iceberg-warehouse/` |
-| spark-operator | `spark-operator` | запуск `SparkApplication` |
-| Cassandra 4.1 ×1 | `data`, :9042 CQL |KV-хранилище (фичи/граф-смежность в будущем) |
+Озером служит MinIO как S3-совместимое хранилище: в нём два бакета — `iceberg-warehouse` под сам warehouse
+и `spark-events` под события Spark.
+Настоящий S3 привязал бы к облаку, HDFS избыточен для одного хоста,
+так что MinIO здесь компромисс между совместимостью с `s3a://` и простотой.
 
-PVC (local-path): minio 50Gi, mysql 10Gi, cassandra 20Gi. Потребление узла в простое: ~5% CPU / 13% RAM.
+Каталогом Iceberg-таблиц работает Hive metastore 4.0.0, слушающий thrift на 9083 с warehouse `s3a://iceberg-warehouse/`.
+Держать отдельный HMS тяжеловесно, зато это штатный путь, который Spark понимает без плясок на стороне движка.
+Бэкендом выбран MySQL 8 с базой `metastore`, и выбор вынужденный: в образе `apache/hive:4.0.0` нет postgres-драйвера,
+а MySQL-драйвер докачивается init-контейнером при старте.
+Мы предпочли смириться с лишней СУБД, чем пересобирать чужой образ Hive.
 
-## Операции
+Запуск Spark-задач отдан spark-operator через `SparkApplication`, чтобы не гонять `spark-submit` руками
+и иметь жизненный цикл job как объект Kubernetes.
+Рядом стоит Cassandra 4.1 в единственном экземпляре на CQL 9042 — задел под key-value фичей
+и графовую смежность, сегодня почти простаивающий.
+Честная оговорка: держать СУБД впрок на стенде с диском под наблюдением — роскошь,
+но выкинуть её позже дешевле, чем встраивать посреди экспериментов.
 
-Доступ: `KYT_HOST=51.250.24.23` (IP только в env, не в коде), ключ `--private-key ~/.ssh/id_ed25519_trajectory`.
+Простой стенда лёгкий: около пяти процентов CPU и тринадцати процентов RAM,
+тома local-path — под MinIO пятьдесят, под MySQL десять, под Cassandra двадцать гигабайт.
+Проверено smoke-прогоном от 2026-09-18: узел в Ready, поды подняты, оба бакета на месте,
+thrift на 9083 принимает TCP, а `nodetool` показывает UN.
+
+Грабли деплоя — это всё следствия чужих умолчаний, тянувших друг друга.
+Образ `minio/minio` на Docker Hub к моменту развёртки оказался мёртв,
+поэтому и сервер, и `mc` переехали на `quay.io/minio/minio`.
+Дальше подвёл entrypoint образа Hive: он молча игнорирует переданный `args`
+и завершается с нулевым кодом, делая вид, что всё хорошо,
+так что metastore теперь стартует напрямую командой `hive --service metastore`.
+В ту же копилку лёг Service с именем `metastore`, из-за которого Kubernetes
+инжектит переменную `METASTORE_PORT` вида `tcp://...`,
+а Hive пытается распарсить её как число и падает с `NumberFormatException`,
+поэтому порт задан явным окружением `METASTORE_PORT=9083`.
+Остальное — трение таймаутов и окружения: Cassandra на холодном старте
+отвечает дольше секунды и валила дефолтную пробу,
+так что `timeoutSeconds` поднят до пятнадцати;
+длинные ожидания рвали SSH, что лечится классическим `ServerAliveInterval`
+в `ansible.cfg`; а системный pip на Ubuntu 24.04 отказался ставить пакеты
+поверх debian-обёрток, поэтому все kubernetes-задачи идут через `/opt/ansible-venv`,
+и только `host_base` работает системным `/usr/bin/python3`,
+причём факты собираются явно, потому что глобальный сбор отключён.
+
+Что дальше — тоже честно. Главный кандидат на упрощение — выкинуть HMS вовсе и перейти на Iceberg JDBC-каталог,
+что снимет с хоста целую JVM примерно в гигабайт, но это отдельная задача,
+потому что меняет путь каталога у всех job.
+Вторая тревога приземлённее: диск хоста занят на семьдесят пять процентов,
+старый проект в `~/v2-bot` остановлен, но его volumes и образы лежат на месте,
+так что за местом нужно следить, иначе озеро встанет первым.
+
+Пароли и версии лежат в `group_vars/all.yml`, для продакшена секреты положено унести в vault.
+Поднимается всё одной командой из README каталога `infra/`:
 
 ```bash
-# повтор/доустановка (идемпотентно)
-KYT_HOST=51.250.24.23 ansible-playbook -i infra/inventory/hosts.yml infra/site.yml --private-key ~/.ssh/id_ed25519_trajectory
-# только smoke
-... --tags smoke
-# kubeconfig с хоста
-ssh -i ~/.ssh/id_ed25519_trajectory ubuntu@51.250.24.23 "sudo cat /etc/rancher/k3s/k3s.yaml"
-# консоль MinIO / CQL
-kubectl -n data port-forward svc/minio 9001:9001
-kubectl -n data exec statefulset/cassandra -- cqlsh
+KYT_HOST=$KYT_HOST ansible-playbook -i infra/inventory/hosts.yml infra/site.yml
+KYT_HOST=$KYT_HOST ansible-playbook -i infra/inventory/hosts.yml infra/site.yml --tags smoke
 ```
-
-Пароли и версии — `infra/group_vars/all.yml` (прод: перенести секреты в `ansible-vault`).
-
-## Проверено (smoke, 2026-09-18)
-
-Node Ready; `minio`, `hive-metastore` Available; `mysql`, `cassandra` Ready; оба бакета на месте; thrift 9083 принимает TCP; `nodetool status` — `UN`.
-
-## Грабли деплоя (зафиксировано, чтобы не повторять)
-
-1. `minio/minio:latest` на Docker Hub мёртв → `quay.io/minio/minio` (+ `mc`).
-2. В образе `apache/hive:4.0.0` нет MySQL-драйвера → init-контейнер качает `mysql-connector-j-8.0.33.jar` в `emptyDir` + `HIVE_AUX_JARS_PATH` (и в main-контейнер тоже).
-3. Entrypoint hive-образа игнорирует `args: [metastore]` и тихо выходит 0 → запуск напрямую `hive --service metastore`.
-4. K8s инжектит `METASTORE_PORT=tcp://...` (Service с именем `metastore`), Hive падает с `NumberFormatException` → явный `env METASTORE_PORT=9083`.
-5. `nodetool` стартует дольше 1с → пробе `timeoutSeconds: 15`.
-6. SSH рвётся на длинных wait → `ServerAliveInterval=30` в `ansible.cfg`.
-7. Системный pip на Ubuntu 24.04 не даёт ставить поверх debian-пакетов → все k8s-задачи идут через `/opt/ansible-venv` (`ansible_python_interpreter`), `host_base` — через `/usr/bin/python3`, facts собираются явно (`gather_facts: false`).
-
-## Что дальше
-
-- I2 закрыт. Кандидат на упрощение: выкинуть HMS в пользу Iceberg JDBC-каталога на Postgres (минус JVM ~1 ГБ) — отдельной задачей.
-- Старый проект (`~/v2-bot`, 13 контейнеров) остановлен `docker stop`, volumes/образы на месте; диск хоста 75% — следить.

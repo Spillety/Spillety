@@ -1,0 +1,67 @@
+{
+  "date": "2026-09-18",
+  "sources": {
+    "ofac_sdn_csv": {
+      "requested": [
+        "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/SDN.CSV",
+        "https://www.treasury.gov/ofac/downloads/sdn.csv"
+      ],
+      "used": "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/SDN.CSV",
+      "effective": "https://wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com/Published/068dbfdf-4087-459b-8fc3-6581361d24a0/2026-09-16/c8c1c0ee-d1cc-4292-a406-549f3d6cd9f8/SDN.CSV?X-Amz-Expires=3600&X-Amz-Security-Token=FwoDYXdzEIT%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaDJuvBYAHyj%2FmNvMxMiLuBKiaz5Y0qGgqba38NKeGYyrNsnVK%2B5zTcwNJr0%2FjBy2YIR0PPzfpyrmQad8yvJYRt3SbO7qS5XFFArsLvnrPRCWvSJeqFZ0NezaTW0jFH5pFSlnc71Hjw1iVRCOiLiIPnKU2EPzWQ8KaZfhuf%2B8Lq3Vz7Uhs9%2BV8om46FogoCyD96phttQVxQGg8c2vfgytWE%2FyAxGpOVPnMax9r5ZYbx0ntbnMPaInfRCBzoHPiNrFq6VimINthdN7BCR2%2Bni1%2BNVTtKus3qh34Nk1mT40gkEKvwr0iAHElB655HeyHsdlqUbirlPEeCeO3HDinQTKILvttym2zLizFYx8ZA2POALlpOkHsna69x7dXLT9Ucf7dORE3gviHaC4VzhGxWqMZBZNguNxgQZ64Y8Cm58w%2ByMQqUn8%2BWFYmTb1ifT26j7QM2KYpFRcSpLZ7ZsJuUfkxMJThG2VAqQkqPGnwDkzzuH8fAZ2HkqVEVSFEfQT%2FKDKY3SJ02Yh6cP%2FRL4MYuo6blO7UpbMXDGwxj0nTXZ3hgx5t4KrNU2NtVlCOAS%2BXoO8X1lm%2B%2BEqvCGrHIRoYBlddInbwSTJk0kmsH9gNE8qyP1vJCiH8NY3nfLE3oTukjvQNRya4RG7bvuKNMbbpAlJllvX%2B7eQjqa%2FV%2BmD3%2FLuIoeBQaWq6n7maaAGOX53mYUOy2VQdAo9HVf7Q3Eg7waiJ3GKgXRXW6l6V7oRV7obB2W45bC07pIVwIxfjRg%2FOtwB1Q3yRPzz3PS5gDL16jR8eYqsDgJ3vBzUeD7BUsWLAgFk7v70f9PXQBcTtFRqdg5RNZqHv7NoJVDnuUhG8lncovvy01QYyQSzBrGxwoacrR%2BntUukClNBil8BlOZslRLpq6HTEN9zmhTNSh8rv5MheqSagVC6F3Y0EWBbEr20DvUJWZptFLno8&response-content-disposition=attachment%3B%20filename%3D%22sdn.csv%22&response-content-type=text%2Fcsv&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=ASIASARBLFPLCYE3OJFY%2F20260918%2Fus-gov-west-1%2Fs3%2Faws4_request&X-Amz-Date=20260918T135258Z&X-Amz-SignedHeaders=host&X-Amz-Signature=ab8d91b025af2e15128a61465b4ca522538071901689241ce1d0449e7c822f9a",
+      "bytes": 5696748,
+      "sha256": "01df2c64828bd5471d0e512c5d609d45f80ea13972d3397491b90e375899e09b",
+      "status": "ok",
+      "attempts": [],
+      "file": "sdn.csv"
+    },
+    "eu_fsf_xml": {
+      "requested": [
+        "https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content",
+        "https://data.opensanctions.org/datasets/latest/eu_fsf/source.xml"
+      ],
+      "used": "https://data.opensanctions.org/datasets/latest/eu_fsf/source.xml",
+      "effective": "https://data.opensanctions.org/artifacts/eu_fsf/20260918125702-ifq/source.xml",
+      "bytes": 25766640,
+      "sha256": "0c83e632fea7709d9c75bdd1deb4fa50782a93d2c99459f01c7a7a2d873c79c9",
+      "status": "ok",
+      "attempts": [
+        {
+          "url": "https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content",
+          "error": "HTTPError: HTTP Error 403: Forbidden"
+        }
+      ],
+      "file": "eu_source.xml"
+    }
+  },
+  "counts": {
+    "ofac_rows": 19400,
+    "ofac_rows_with_crypto": 99,
+    "ofac_pairs": 505,
+    "eu_entities": 6234,
+    "eu_remarks": 6749,
+    "eu_pairs": 8,
+    "addresses": 507,
+    "by_currency": {
+      "TRX": 83,
+      "XMR": 6,
+      "USDT": 41,
+      "BTC": 263,
+      "ETH": 88,
+      "LTC": 8,
+      "ZEC": 3,
+      "DASH": 5,
+      "BTG": 1,
+      "XVG": 1,
+      "BCH": 2,
+      "SOL": 2,
+      "DOGE": 2,
+      "BNB": 1,
+      "BSC": 1
+    },
+    "by_source": {
+      "ofac_sdn": 499,
+      "eu_fsf": 8
+    }
+  },
+  "notes": "EU direct FSF endpoint needs a token (403); using the OpenSanctions mirror of the genuine EU FSF XML. EU XML has no dedicated crypto field; wallets mined from free-text remarks."
+}

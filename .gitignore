@@ -222,6 +222,8 @@ TASKS
 temp.md
 *.zip
 data/elliptic_raw/
+data/sanctions/raw/
+data/derived/
 node_modules/
 
 # обученные артефакты (веса/калибраторы) — описания и метрики храним

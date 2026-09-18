@@ -1,0 +1,40 @@
+{
+  "test": {
+    "name": "B:refit-train+sel",
+    "pr_auc_raw": 0.6414758153623767,
+    "pr_auc_cal": 0.6414758153623766,
+    "roc_auc_cal": 0.8739833933717287,
+    "brier_raw": 0.026565835256733606,
+    "brier_cal": 0.02623623579767866,
+    "ece_raw": 0.025731149135519427,
+    "ece_cal": 0.012015638304167447,
+    "calibrator": "beta",
+    "pr_auc_valid": 0.8946036310234908
+  },
+  "ablation": [
+    {
+      "name": "A:v1-protocol+new feats",
+      "pr_auc_raw": 0.3535369389648388,
+      "pr_auc_cal": 0.3526908148183301,
+      "roc_auc_cal": 0.6583969465648855,
+      "brier_raw": 0.05254186020076447,
+      "brier_cal": 0.03500890634458894,
+      "ece_raw": 0.052541836441691636,
+      "ece_cal": 0.020183525480352515,
+      "calibrator": "isotonic",
+      "pr_auc_valid": 0.5510639971086033
+    },
+    {
+      "name": "B:refit-train+sel",
+      "pr_auc_raw": 0.6414758153623767,
+      "pr_auc_cal": 0.6414758153623766,
+      "roc_auc_cal": 0.8739833933717287,
+      "brier_raw": 0.026565835256733606,
+      "brier_cal": 0.02623623579767866,
+      "ece_raw": 0.025731149135519427,
+      "ece_cal": 0.012015638304167447,
+      "calibrator": "beta",
+      "pr_auc_valid": 0.8946036310234908
+    }
+  ]
+}

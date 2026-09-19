@@ -112,3 +112,51 @@ def anchor_loss(
     d_an = np.linalg.norm(za[:, None, :] - zn[None, :, :], axis=-1)
     push = float(np.maximum(0.0, m_push - d_an).mean())
     return lam * (pull + push)
+
+
+def hetero_contrastive_loss(
+    z_addr: np.ndarray,
+    z_tx: np.ndarray,
+    pos: np.ndarray,
+    tau: float = 0.1,
+) -> float:
+    """
+    ## Cross-type NT-Xent over address→tx positive pairs (§4.2.2, §4.4.2)
+
+    Parameters
+    ----------
+    z_addr : np.ndarray
+        Address embeddings (Na, d).
+    z_tx : np.ndarray
+        Transaction embeddings (Nt, d).
+    pos : np.ndarray
+        Positive pairs (P, 2) of (addr_idx, tx_idx).
+    tau : float
+        Temperature, must be > 0.
+
+    Returns
+    ----------
+    float
+        Mean cross-entropy of each anchor address over all tx nodes.
+    """
+    if tau <= 0:
+        raise ValueError(f"tau must be > 0, got {tau}")
+    if z_addr.ndim != 2 or z_tx.ndim != 2:
+        raise ValueError("z_addr and z_tx must be 2D")
+    if z_addr.shape[1] != z_tx.shape[1]:
+        raise ValueError("z_addr and z_tx must share width d")
+    if pos.ndim != 2 or pos.shape[1] != 2:
+        raise ValueError(f"pos must be (P, 2), got {pos.shape}")
+    if len(pos) == 0:
+        raise ValueError("pos must be non-empty")
+    if pos[:, 0].max() >= len(z_addr) or pos[:, 1].max() >= len(z_tx):
+        raise ValueError("pos indices out of range")
+    if pos.min() < 0:
+        raise ValueError("pos indices must be >= 0")
+    # ponytail: O(Na*Nt) full similarity; for Na*Nt > 1e8 switch to batched chunks.
+    na = z_addr / (np.linalg.norm(z_addr, axis=1, keepdims=True) + 1e-12)
+    nt = z_tx / (np.linalg.norm(z_tx, axis=1, keepdims=True) + 1e-12)
+    sim = (na @ nt.T) / tau
+    sim = sim - sim.max(axis=1, keepdims=True)
+    logsumexp = np.log(np.sum(np.exp(sim), axis=1) + 1e-12)
+    return float(np.mean(-(sim[pos[:, 0], pos[:, 1]] - logsumexp[pos[:, 0]])))

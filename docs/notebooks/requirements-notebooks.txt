@@ -6,3 +6,4 @@ numpy>=1.26
 scikit-learn>=1.4
 scipy>=1.12
 networkx>=3.2
+shap>=0.52.2

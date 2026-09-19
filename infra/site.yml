@@ -20,3 +20,11 @@
       tags: [cassandra]
     - role: smoke
       tags: [smoke]
+
+- name: Deploy and train Spillety models
+  hosts: kyt
+  become: false
+  gather_facts: false
+  roles:
+    - role: spillety
+      tags: [spillety]

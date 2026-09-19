@@ -1,0 +1,23 @@
+spillety_work_dir: ~/spillety-work
+spillety_data_dir: "{{ spillety_work_dir }}/data/elliptic_raw"
+spillety_models_dir: "{{ spillety_work_dir }}/models"
+
+# Python packages to install
+spillety_pip_packages:
+  - lightgbm
+  - torch
+  - scikit-learn
+  - numpy
+  - pandas
+  - networkx
+  - scipy
+  - joblib
+
+# Torch index URL for CPU-only installation
+torch_index_url: "https://download.pytorch.org/whl/cpu"
+
+# Model training
+spillety_model_versions:
+  - elliptic_v1
+  - elliptic_v2
+  - elliptic_v3

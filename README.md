@@ -40,19 +40,17 @@ make notebooks   # pip install -r docs/notebooks/requirements-notebooks.txt
 
 # Метрики
 
-| Метрика | КОнкуренты (Weber) | Spillety | Потолок теории |
+| Метрика | Другие решения | Spillety | Потолок теории |
 |---|---|---|---|
-| PR-AUC | не публикуется | 0.656 | ~0.80 |
+| PR-AUC | - | 0.656 | ~0.80 |
 | F1 illicit | 0.705 — Weber | 0.713 (best-F1, τ=0.671) | ~0.80 |
 | Precision / Recall | 0.812 / 0.623 — Weber | 0.955 / 0.569 (312 алертов) | — |
-| ROC-AUC | не публикуется | 0.872 | — |
-| Brier | не публикуется | 0.024 | <0.02 |
-| ECE | не публикуется | 0.011 | <0.01 |
-| precision@100 / @500 / @1000 | не публикуется | 1.00 / 0.62 / 0.33 | — |
+| ROC-AUC | - | 0.872 | — |
+| Brier | - | 0.024 | <0.02 |
+| ECE | - | 0.011 | <0.01 |
+| precision@100 / @500 / @1000 | - | 1.00 / 0.62 / 0.33 | — |
 
 *Weber et al. 2019 (Skip-GCN, темпоральный сплит 70:30). У нас строже: тест — последние 9 шагов, доля illicit другая.*
-
-Walk-forward (train 1..t, test t+1): PR-AUC ~0.87–1.0 на шагах 31–42, обвал до 0.05 на шаге 43 (коллапс меток: base_rate 0.018 → метки почти не размечены). Подробности: `models/elliptic_v3/metrics.json` и `walkforward.csv`.
 
 ![PR curve](./docs/img/pr_curve.png)
 

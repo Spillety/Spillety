@@ -24,11 +24,17 @@ from spillety.embeddings.pairs import (
     sample_negatives,
     sampling_probs,
 )
-from spillety.embeddings.sage import encode
-from spillety.embeddings.temporal import EvolveGCNEncoder, encode_temporal
+from spillety.embeddings.sage import encode, encode_gated
+from spillety.embeddings.temporal import (
+    DecoupledEvolveGCNEncoder,
+    EvolveGCNEncoder,
+    encode_temporal,
+    encode_temporal_decoupled,
+)
 
 __all__ = [
     "EDGE_TYPES",
+    "DecoupledEvolveGCNEncoder",
     "EvolveGCNEncoder",
     "StudentMLP",
     "anchor_loss",
@@ -37,7 +43,9 @@ __all__ = [
     "drop_edges",
     "encode",
     "encode_account_graph",
+    "encode_gated",
     "encode_temporal",
+    "encode_temporal_decoupled",
     "hard_negatives",
     "hetero_contrastive_loss",
     "jaccard_index",

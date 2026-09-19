@@ -22,7 +22,7 @@ def focal_loss_objective(gamma=2.0, alpha=0.25):
     """
     def objective(y_pred, dataset):
         y_true = np.asarray(dataset.get_label()).astype(float)
-        y_pred = np.asarray(y_pred).astype(float)
+        y_pred = np.clip(np.asarray(y_pred).astype(float), -30, 30)
         p = 1.0 / (1.0 + np.exp(-y_pred))
         pt = np.where(y_true == 1, p, 1 - p)
         grad = -alpha * (1 - pt) ** gamma * (y_true - p)

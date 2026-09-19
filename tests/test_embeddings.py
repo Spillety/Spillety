@@ -14,6 +14,7 @@ from spillety.embeddings.pairs import (
     sample_negatives,
     sampling_probs,
 )
+from spillety.embeddings.temporal import encode_temporal_decoupled
 
 SEED = 72
 
@@ -123,3 +124,65 @@ def test_sage_encode_shape():
     z = encode(x, edge_index, hidden_dim=8, out_dim=4, seed=SEED)
     assert isinstance(z, torch.Tensor)
     assert z.shape == (12, 4)
+
+
+def test_haar_level2_roundtrip():
+    from spillety.features.wavelet import haar_level2
+
+    x = np.random.default_rng(SEED).normal(size=(5, 16))
+    wc = haar_level2(x)
+    assert wc.shape == x.shape
+    assert np.isfinite(wc).all()
+
+
+def test_wavelet_features_doubles_columns():
+    from spillety.features.wavelet import wavelet_features
+
+    x = np.random.default_rng(SEED).normal(size=(8, 10))
+    out = wavelet_features(x)
+    assert out.shape == (8, 20)
+    assert np.array_equal(out[:, :10], x)
+
+
+def test_sage_encode_gated_shape():
+    torch = pytest.importorskip("torch")
+    pytest.importorskip("torch_geometric")
+    from spillety.embeddings.sage import encode_gated
+
+    g = np.random.default_rng(SEED)
+    x = g.normal(size=(12, 6)).astype(np.float32)
+    edge_index = np.array([[i, (i + 1) % 12] for i in range(12)]).T
+    z = encode_gated(x, edge_index, hidden_dim=8, out_dim=4, seed=SEED)
+    assert isinstance(z, torch.Tensor)
+    assert z.shape == (12, 4)
+
+
+def test_encode_temporal_decoupled_shape():
+    torch = pytest.importorskip("torch")
+    g = np.random.default_rng(SEED)
+    n_nodes, in_dim, T = 10, 6, 4
+    xs = [g.normal(size=(n_nodes, in_dim)).astype(np.float32) for _ in range(T)]
+    edge_indices = [
+        np.array([[i, (i + 1) % n_nodes] for i in range(n_nodes)]).T
+        for _ in range(T)
+    ]
+    out = encode_temporal_decoupled(xs, edge_indices, hidden_dim=8, out_dim=4, seed=SEED)
+    assert isinstance(out, torch.Tensor)
+    assert out.shape == (T, n_nodes, 4)
+
+
+def test_haar_level2_constant_signal():
+    from spillety.features.wavelet import haar_level2
+
+    x = np.ones((3, 8)) * 5.0
+    wc = haar_level2(x)
+    assert wc.shape == x.shape
+    assert np.isfinite(wc).all()
+
+
+def test_haar_level2_odd_columns():
+    from spillety.features.wavelet import haar_level2
+
+    x = np.random.default_rng(SEED).normal(size=(4, 7))
+    wc = haar_level2(x)
+    assert wc.shape == x.shape

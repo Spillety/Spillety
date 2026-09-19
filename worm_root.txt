@@ -2,7 +2,7 @@
   "merkle_root": "6ef13055c905c0af78d4c2384b3512ec3f18431c59967622f8eeb6ed99ed2d42",
   "root_b64": "bvEwVckFwK941MI4SzUS7D8YQxxZlnYi+O627ZntLUI=",
   "n_alerts": 100,
-  "worm_head": "ea5768ca74552187c06b628ae4213d40d5da28d5322f27a05dc20de9582ce298",
-  "anchored_at": "2026-09-19T08:24:35.071946+00:00",
+  "worm_head": "1214b278b52fbc21faccddebf0446ce0e4c44c4334a469a52874e837a664a51b",
+  "anchored_at": "2026-09-19T12:20:00.805479+00:00",
   "proxy": "OpenTimestamps -> Bitcoin (mock, OTS stamp of root)"
 }

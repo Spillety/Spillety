@@ -136,3 +136,54 @@ def hard_negatives(
         if a != b and labels[a] != labels[b] and abs(int(times[a]) - int(times[b])) <= eps:
             out.append((a, b))
     return np.array(out, dtype=int).reshape(-1, 2)
+
+
+def knn_hard_negatives(
+    z: np.ndarray,
+    n: int,
+    k: int = 10,
+    labels: np.ndarray | None = None,
+    rng: int | np.random.Generator | None = None,
+) -> np.ndarray:
+    """
+    ## Hard negatives from the kNN neighborhood, not uniform sampling (§4.3.2)
+
+    Parameters
+    ----------
+    z : np.ndarray
+        L2-comparable embeddings (N, d).
+    n : int
+        Pairs to sample.
+    k : int
+        Neighborhood size; must satisfy 1 <= k < N.
+    labels : np.ndarray | None
+        Cluster id per node; same-label neighbors are excluded when given.
+    rng : int | Generator | None
+        Seed or generator.
+
+    Returns
+    ----------
+    np.ndarray
+        Sampled pairs (M, 2), M <= n; each partner lies in the
+        anchor's k nearest neighbors.
+    """
+    g = _rng(rng)
+    count = z.shape[0]
+    if not 1 <= k < count:
+        raise ValueError(f"k must satisfy 1 <= k < N={count}, got {k}")
+    if n <= 0:
+        return np.zeros((0, 2), dtype=int)
+    # ponytail: O(N^2) full distance matrix; for N > 50k switch to HNSW retrieval.
+    d = np.linalg.norm(z[:, None, :] - z[None, :, :], axis=-1)
+    np.fill_diagonal(d, np.inf)
+    order = np.argsort(d, axis=1)[:, :k]
+    out = []
+    for _ in range(n):
+        a = int(g.integers(0, count))
+        pool = order[a]
+        if labels is not None:
+            pool = pool[labels[pool] != labels[a]]
+        if len(pool) == 0:
+            continue
+        out.append((a, int(pool[g.integers(0, len(pool))])))
+    return np.array(out, dtype=int).reshape(-1, 2)

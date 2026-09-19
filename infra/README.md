@@ -11,11 +11,31 @@ Ubuntu 22.04/24.04, ≥16 ГБ RAM, ≥4 CPU, ≥100 ГБ диска, интер
 ```bash
 pip install ansible kubernetes
 ansible-galaxy collection install -r infra/requirements.yml
-export KYT_HOST=158.160.29.228   # или -e kyt_host=... ; IP вне кода
-ansible-playbook -i infra/inventory/hosts.yml infra/site.yml --private-key ~/.ssh/id_ed25519_trajectory
+export KYT_HOST=<IP>   # или -e kyt_host=... ; IP вне кода
+ansible-playbook -i infra/inventory/hosts.yml infra/site.yml --private-key ~/.ssh/<private-key>
 ```
 
 Частично: `--tags minio,mysql,metastore`. Проверка отдельно — роль `smoke` уже в конце `site.yml`.
+
+### Деплой и переобучение моделей Spillety
+
+```bash
+# Только роль spillety (код + обучение + метрики)
+ansible-playbook -i infra/inventory/hosts.yml infra/site.yml \
+  --private-key ~/.ssh/<private-key> \
+  --tags spillety
+
+# С повторным кодом (skip deps/train, только sync)
+ansible-playbook -i infra/inventory/hosts.yml infra/site.yml \
+  --private-key ~/.ssh/<private-key> \
+  --tags code
+```
+
+Роль `spillety`:
+1. Синхронизирует `spillety/` и `scripts/` на VM через rsync
+2. Устанавливает pip-пакеты (lightgbm, torch CPU, sklearn, ...)
+3. Переобучает v1 → v2 → v3 ensemble
+4. Забирает `metrics.json` и `walkforward.csv` обратно в `models/elliptic_v3/`
 
 ## Что где
 

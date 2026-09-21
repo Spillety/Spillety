@@ -1,6 +1,7 @@
 import numpy as np
 
 from spillety.entity.cioh import cluster_cioh
+from spillety.entity.dbscan import choose_dbscan_params, cluster_dbscan
 from spillety.entity.fusion import (
     brier_score,
     copula_proba,
@@ -164,3 +165,47 @@ def test_tau_star_minimizes_cost():
     pred_mid = (s >= 0.5).astype(int)
     mid = float(((pred_mid == 1) & (y == 0)).sum() + ((pred_mid == 0) & (y == 1)).sum())
     assert cost_mid <= mid
+
+
+def test_choose_dbscan_params_returns_valid_dict():
+    rng = np.random.default_rng(SEED)
+    X = rng.normal(0, 1, (100, 4))
+    y = rng.integers(0, 2, 100)
+    res = choose_dbscan_params(X, y, cost_fp=10.0, cost_fn=1.0)
+    assert isinstance(res, dict)
+    for key in ("eps", "min_pts", "cost", "cost_breakdown", "n_clusters", "noise_frac"):
+        assert key in res, f"missing key {key}"
+    assert "fp" in res["cost_breakdown"]
+    assert "fn" in res["cost_breakdown"]
+    assert "cost_fp" in res["cost_breakdown"]
+    assert "cost_fn" in res["cost_breakdown"]
+    assert isinstance(res["eps"], float)
+    assert isinstance(res["min_pts"], int)
+    assert res["n_clusters"] >= 1
+    assert 0.0 <= res["noise_frac"] <= 1.0
+
+
+def test_cluster_dbscan_produces_valid_labels():
+    rng = np.random.default_rng(SEED)
+    blob = rng.normal(0, 0.1, (50, 2))
+    noise = rng.uniform(-5, 5, (10, 2))
+    X = np.vstack([blob, noise])
+    labels = cluster_dbscan(X, eps=0.5, min_pts=3, max_size=100)
+    assert labels.ndim == 1
+    assert len(labels) == len(X)
+    assert labels.dtype == np.int64 or labels.dtype == np.int32
+    for cid in np.unique(labels):
+        if cid == -1:
+            continue
+        assert (labels == cid).sum() <= 100
+
+
+def test_dbscan_cluster_count_reasonable_on_validation_embeddings():
+    rng = np.random.default_rng(SEED)
+    c1 = rng.normal(-3, 0.3, (60, 2))
+    c2 = rng.normal(3, 0.3, (60, 2))
+    noise = rng.uniform(-8, 8, (20, 2))
+    X = np.vstack([c1, c2, noise])
+    labels = cluster_dbscan(X, eps=0.8, min_pts=5, max_size=50)
+    n_clusters = len([c for c in np.unique(labels) if c != -1])
+    assert 1 <= n_clusters <= 10, f"unexpected cluster count {n_clusters}"

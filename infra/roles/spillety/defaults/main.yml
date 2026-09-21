@@ -6,12 +6,14 @@ spillety_models_dir: "{{ spillety_work_dir }}/models"
 spillety_pip_packages:
   - lightgbm
   - torch
+  - torch-geometric
   - scikit-learn
   - numpy
   - pandas
   - networkx
   - scipy
   - joblib
+  - shap
 
 # Torch index URL for CPU-only installation
 torch_index_url: "https://download.pytorch.org/whl/cpu"
@@ -21,3 +23,5 @@ spillety_model_versions:
   - elliptic_v1
   - elliptic_v2
   - elliptic_v3
+  - elliptic_graphsage
+  - elliptic_v3_ofac

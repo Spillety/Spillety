@@ -38,9 +38,11 @@ Materiality — сочетание **model exposure** (влияние выход
 | GBDT (LightGBM) | **Model** | Количественный метод со статистической теорией |
 | Rule-based filters | **Может не квалифицироваться как model** | Детерминированные правила без статистической теории |
 | HNSW retrieval | **Not model** | Детерминированный алгоритм поиска |
-| LLM Explainer | **Вне scope** | Generative AI вне SR 26-2 (принципы governance — по аналогии) |
+| LLM Explainer (GigaChat) | **Low** | Derived field only, human-review gate, no auto-submit, Daubert risk: hallucination |
 
 Независимо от классификации non-model компоненты подлежат FFIEC independent testing — верификации логики и реализации.
+
+GigaChat narrative пишется только в `sar.narrative` status=draft; `approve_sar` требует reviewer_id; автоподача запрещена кодом (`PermissionError`).
 
 ### 11.1.4. Валидация
 

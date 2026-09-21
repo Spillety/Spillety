@@ -2,7 +2,7 @@
 
 _Spill the tea about your transactions._
 
-**Spillety** — студенческий Know Your Transaction движок, который решает две большие задачи: дорогой инференс на GPU и разметка данных. Наш подход был вдохновлён академической теорией и идеями из разделов математики и алгоритмики. 
+**Spillety** — KYT-пайплайн для мониторинга криптовалютных транзакций. Решает две ключевые задачи: дорогой инференс на GPU и зависимость от ручной разметки. Подход основан на публичных санкционных списках как системе координат, индуктивных графовых представлениях и cost-based принятии решений. 
 
 | Показатель | Общепринятый подход | Подход Spillety | Идея |
 |---|---|---|---|
@@ -40,17 +40,34 @@ make notebooks   # pip install -r docs/notebooks/requirements-notebooks.txt
 
 # Метрики
 
-| Метрика | Другие решения | Spillety | Потолок теории |
+### RF Proxy (`12_metrics_dashboard`, train 1–30 / valid 31–40)
+
+| Метрика | Значение | Base rate | Примечание |
 |---|---|---|---|
-| PR-AUC | - | 0.656 | ~0.80 |
-| F1 illicit | 0.705 — Weber | 0.713 (best-F1, τ=0.671) | ~0.80 |
-| Precision / Recall | 0.812 / 0.623 — Weber | 0.955 / 0.569 (312 алертов) | — |
-| ROC-AUC | - | 0.872 | — |
-| Brier | - | 0.024 | <0.02 |
-| ECE | - | 0.011 | <0.01 |
-| precision@100 / @500 / @1000 | - | 1.00 / 0.62 / 0.33 | — |
+| PR-AUC | 0.647 | — | validation set |
+| Brier | 0.025 | — | validation set |
+| ECE | 0.016 | — | validation set |
+| Precision@100 | 0.98 | — | top-100 retrieval |
+
+### LightGBM Focal (`05_gbdt_calibration`, train 1–30 / valid 31–40)
+
+| Метрика | Значение | Base rate | Примечание |
+|---|---|---|---|
+| F1 illicit | 0.713 | 0.053 | best-F1, τ=0.671 |
+| Precision | 0.955 | 0.053 | best-F1 |
+| Recall | 0.569 | 0.053 | best-F1 |
+
+### Ensemble v3 (`13_end_to_end`, test steps 41–49)
+
+| Метрика | Значение | Base rate | Примечание |
+|---|---|---|---|
+| PR-AUC | 0.656 | 0.053 | temporal test split 41–49 |
+| ECE | 0.011 | 0.053 | temporal test split 41–49 |
+| Precision@100 | 1.0 | 0.053 | test steps 41–49 |
 
 *Weber et al. 2019 (Skip-GCN, темпоральный сплит 70:30). У нас строже: тест — последние 9 шагов, доля illicit другая.*
+
+*Base rate — доля illicit-классов в соответствующей оценочной выборке. RF Proxy и LightGBM оценены на validation (шаги 31–40), Ensemble v3 — на test (шаги 41–49).*
 
 ![PR curve](./docs/img/pr_curve.png)
 

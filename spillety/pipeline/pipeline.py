@@ -142,7 +142,17 @@ class SpilletyPipeline:
             values = values[:, :, 1]
         return values
 
-    def predict(self, frames, *, causal_passed=None, e_value=None, gamma=None):
+    def predict(
+        self,
+        frames,
+        *,
+        causal_passed=None,
+        e_value=None,
+        gamma=None,
+        retrieval_anchors=None,
+        causal_path=None,
+        provenance=None,
+    ):
         """
         ## Scores, tiers and evidence records for upstream frames
 
@@ -154,6 +164,12 @@ class SpilletyPipeline:
             Per-row upstream causal filter outcome.
         e_value, gamma : np.ndarray | None
             Per-row sensitivity metrics.
+        retrieval_anchors : list[list[dict]] | None
+            Per-row top-K anchors: [[{wallet, source, distance}, ...], ...].
+        causal_path : list[list[dict]] | None
+            Per-row DAG edges: [[{effect, gamma}, ...], ...].
+        provenance : dict | None
+            Build metadata: model_version, encoder_version, hnsw_params, calibrator, tau, cost_ratio.
 
         Returns
         ----------
@@ -195,6 +211,8 @@ class SpilletyPipeline:
                 self.feature_names_[j]: float(shap_values[i, j]) for j in order
             }
             tiers.append(tier)
+            anchors_i = retrieval_anchors[i] if retrieval_anchors else None
+            causal_path_i = causal_path[i] if causal_path else None
             evidences.append(
                 build_evidence(
                     float(scores[i]),
@@ -205,6 +223,9 @@ class SpilletyPipeline:
                         "gamma": None if np.isnan(gammas[i]) else float(gammas[i]),
                         "causal_passed": bool(causal[i]),
                     },
+                    anchors=anchors_i,
+                    causal_path=causal_path_i,
+                    provenance=provenance,
                 )
             )
         return scores, tiers, evidences

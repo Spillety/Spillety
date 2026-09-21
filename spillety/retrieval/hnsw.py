@@ -136,6 +136,28 @@ def build_index(
     return index
 
 
+def build_index_temporal(
+    anchors_by_era: dict[str, np.ndarray],
+    **kwargs,
+) -> dict[str, object]:
+    """
+    ## Build separate HNSW indices per temporal era (§4.3.5)
+
+    Parameters
+    ----------
+    anchors_by_era : dict[str, np.ndarray]
+        Keys "train", "valid", "test" with anchor embeddings per era.
+    **kwargs : dict
+        Passed to `build_index` (m, ef_construction, ef_search).
+
+    Returns
+    ----------
+    dict[str, object]
+        Keys "train", "valid", "test" with hnswlib indices.
+    """
+    return {era: build_index(anchors, **kwargs) for era, anchors in anchors_by_era.items() if anchors.shape[0] > 0}
+
+
 def query_index(
     index, queries: np.ndarray, k: int, ef_search: int | None = None
 ) -> tuple[np.ndarray, np.ndarray]:

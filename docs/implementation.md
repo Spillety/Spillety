@@ -58,7 +58,7 @@
 
 Классификатор в `spillety/models/gbdt.py` — LightGBM, и это строгая зависимость в `pyproject.toml`, а не опция: `num_leaves` выбирается из {31, 63, 127} по PR-AUC на hold-out с парным бутстрепом и правилом парсимонии (простейший из не уступающих), дисбаланс гасится через `scale_pos_weight`. Почему бустинг, а не нейросеть? На табличных признаках и сотнях тысяч строк он обучается на CPU за минуты и раскладывается на вклады — а нам по ним отчитываться перед проверяющим.
 
-Калибровка в `spillety.models.calibration` — изотоника против beta (выбор по ECE/Brier на тесте с бутстреп-CI, при неразличимости побеждает beta как более устойчивая). Platt/sigmoid в коде нет — сигмоиды из старых черновиков не пережили сверку с теорией §7.5, и мы их не упоминаем, чтобы не врать. Процедура выбора держится на временном разбиении: GBDT учится на train, оба калибратора подгоняются на validation, сравниваются на test с bootstrap CI для разностей — побеждает статистически значимо меньший ECE, а reliability diagram показывает, легла ли ломаная на диагональ. Измеренное на `models/elliptic_v3/` (ансамбль `0.25×v1 + 0.75×v2-B`, тест — шаги 41–49): PR-AUC 0.655, ECE 0.011, precision@100 = 1.0 — топ-100 скоринга чистый illicit, топ-500 — почти две трети. Объяснимость — TreeSHAP (`shap.TreeExplainer` в pipeline, топ-10 вкладов в каждый evidence JSON), и `shap` тоже строгая зависимость. Скажем прямо: SHAP-вклады ассоциативны, а не причинны; причинный язык — только из DAG-слоя, смешивать их в доказательствах нельзя.
+Калибровка в `spillety.models.calibration` — изотоника против beta (выбор по ECE/Brier на тесте с бутстреп-CI, при неразличимости побеждает beta как более устойчивая). Platt/sigmoid в коде нет — сигмоиды из старых черновиков не пережили сверку с теорией §7.5, и мы их не упоминаем, чтобы не врать. Процедура выбора держится на временном разбиении: GBDT учится на train, оба калибратора подгоняются на validation, сравниваются на test с bootstrap CI для разностей — побеждает статистически значимо меньший ECE, а reliability diagram показывает, легла ли ломаная на диагональ. Измеренное на `models/elliptic_v3/` (ансамбль `0.25×v1 + 0.75×v2-B`, тест — шаги 41–49): PR-AUC 0.656, ECE 0.011, precision@100 = 1.0 — топ-100 скоринга чистый illicit, топ-500 — почти две трети. Объяснимость — TreeSHAP (`shap.TreeExplainer` в pipeline, топ-10 вкладов в каждый evidence JSON), и `shap` тоже строгая зависимость. Скажем прямо: SHAP-вклады ассоциативны, а не причинны; причинный язык — только из DAG-слоя, смешивать их в доказательствах нельзя.
 
 Потолок связки «табличка + PCA-дистанции» на этом датасете авторы прогона оценивают в ~0.65–0.70 на поздних шагах: сетка гиперпараметров (18 точек) и временные веса ничего не дали, оптимумом оказались дефолты. Дальше — только GraphSAGE вместо PCA, OFAC-якоря вместо train-illicit и свежие метки с переобучением по дрейф-гейту.
 
@@ -108,14 +108,17 @@
 | Isotonic/Platt → beta-калибровка | ✓ (beta в коде; Platt не было) |
 | sklearn NN → hnswlib | ✓, recall@10 0.995 измерен |
 | SHAP → TreeSHAP | ✓ в pipeline |
-| PCA → GraphSAGE 128 | остаток (модуль есть, нужен torch) |
-| Feature-gated GraphSAGE | ✓ в `sage.py::encode_gated` (нужен torch_geometric) |
-| Decoupled temporal encoder | ✓ в `temporal.py::DecoupledEvolveGCNEncoder` (нужен torch_geometric) |
+| PCA → GraphSAGE 128 | остаток (модуль есть, нужен torch + обучение) |
+| Feature-gated GraphSAGE | ✓ в `sage.py::encode_gated` (нужен torch_geometric + обучение) |
+| Decoupled temporal encoder | ✓ в `temporal.py::DecoupledEvolveGCNEncoder` (нужен torch_geometric + обучение) |
 | Haar wavelet (level-2) | ✓ в `features/wavelet.py`, PR-AUC 0.627 (шум, не в продакшене) |
 | Focal loss | ✓ в `models/focal.py`, PR-AUC 0.199 (нестабильна, не в продакшене) |
-| train-illicit якоря → OFAC-якоря | остаток (507 адресов собраны, не встроены) |
+| train-illicit якоря → OFAC-якоря | ✓ `retrieval/ofac_anchors.py` (OFAC-pool + fallback + coverage метрика) |
 | HMAC → Ed25519 | остаток (авто при наличии `cryptography`) |
-| OTS-заглушка → настоящий анкоринг | остаток |
+| OTS-заглушка → настоящий анкоринг | остаток (async-клиент + verify в plans) |
 | HSM/продакшен-подписи | остаток |
+| Lead time метрика | ✓ `temporal/leadtime.py::evaluate_lead_time` |
+| Precision@K + bootstrap CI | ✓ `metrics/operational.py::precision_at_k` |
+| Cost savings vs baseline | ✓ `metrics/operational.py::savings_vs_baseline` |
 
 Порядок оставшегося важнее списка. GraphSAGE даст наибольший прирост качества, но требует GPU-стека; OFAC-якоря — следующий по цене шаг после эмбеддингов; OTS и HSM — про доверие, а не про метрики. Решать стоит по данным: прогнать очередную волну экспериментов, посмотреть, где прокси перестаёт поспевать за задачей, и апгрейдить именно там.

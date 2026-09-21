@@ -28,7 +28,7 @@ def collect():
 def build_block(paths):
     if not paths:
         return f"{START}\n<!-- no files -->\n{END}"
-    return "\n".join([START] + [f"- `https://github.com/Spillety/Spillety/{p}`" for p in paths] + [END])
+    return "\n".join([START] + [f"- `https://github.com/Spillety/Spillety/blob/main/{p}`" for p in paths] + [END])
 
 
 def main():

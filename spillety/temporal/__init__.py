@@ -1,4 +1,5 @@
 from spillety.temporal.drift import cohen_d, is_drift, ks_stats, median_distance, tau_d
+from spillety.temporal.leadtime import LeadTimeResult, evaluate_lead_time
 from spillety.temporal.policy import (
     classify_regime,
     hnsw_action,
@@ -10,9 +11,11 @@ from spillety.temporal.policy import (
 from spillety.temporal.sampling import audit_range, power_n
 
 __all__ = [
+    "LeadTimeResult",
     "audit_range",
     "classify_regime",
     "cohen_d",
+    "evaluate_lead_time",
     "hnsw_action",
     "is_drift",
     "ks_stats",

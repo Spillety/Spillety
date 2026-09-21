@@ -23,6 +23,7 @@ from spillety.embeddings.pairs import (
     positive_pairs,
     sample_negatives,
     sampling_probs,
+    temporal_anchor_split,
 )
 from spillety.embeddings.sage import encode, encode_gated
 from spillety.embeddings.temporal import (
@@ -58,4 +59,5 @@ __all__ = [
     "pull_margin",
     "sample_negatives",
     "sampling_probs",
+    "temporal_anchor_split",
 ]

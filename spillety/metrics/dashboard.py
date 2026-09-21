@@ -3,7 +3,46 @@ from sklearn.metrics import average_precision_score
 
 from spillety.models.calibration import brier_score, ece_score, reliability_stats
 
-__all__ = ["brier_score", "ece_score", "pr_auc_score", "reliability_table"]
+__all__ = ["brier_score", "ece_bootstrap_ci", "ece_score", "pr_auc_score", "reliability_table"]
+
+
+def ece_bootstrap_ci(y_true, y_prob, n_bins=10, n_boot=1000, random_state=72) -> dict:
+    """
+    ## ECE with bootstrap 95% CI (percentile method, §7.6.4)
+
+    Parameters
+    ----------
+    y_true : np.ndarray
+        Binary labels.
+    y_prob : np.ndarray
+        Predicted probabilities.
+    n_bins : int
+        Bin count M.
+    n_boot : int
+        Bootstrap replications.
+    random_state : int
+        Seed for resampling.
+
+    Returns
+    ----------
+    dict
+        `{"ece": float, "ci_lower": float, "ci_upper": float, "n_boot": int}`.
+    """
+    rng = np.random.default_rng(random_state)
+    y_true = np.asarray(y_true)
+    y_prob = np.asarray(y_prob)
+    n = len(y_true)
+    ece_vals = np.empty(n_boot)
+    for b in range(n_boot):
+        idx = rng.integers(0, n, n)
+        ece_vals[b] = ece_score(y_true[idx], y_prob[idx], n_bins=n_bins)
+    ece_point = ece_score(y_true, y_prob, n_bins=n_bins)
+    return {
+        "ece": float(ece_point),
+        "ci_lower": float(np.percentile(ece_vals, 2.5)),
+        "ci_upper": float(np.percentile(ece_vals, 97.5)),
+        "n_boot": n_boot,
+    }
 
 
 def pr_auc_score(y_true, y_score):

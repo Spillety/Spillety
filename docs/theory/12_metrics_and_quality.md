@@ -59,7 +59,28 @@ Isotonic против beta: непараметрическая гибкость 
 
 **TTD** (Time To Detection): $t_{\text{alert}} - t_{\text{first signal}}$ — ключевая метрика для новых санкций; регуляторный контекст дедлайнов SAR — в разделе 11.
 
+**Lead time** (self-evolution): $t_{\text{sanction}} - t_{\text{first\_alert}}$ — медианное время от появления в санкционном списке до первого алерта в топ-K (прошедшем DAG-фильтр и cost-based $\tau^*$). Цель: $\le 3$ шагов. Стратификация по эпохам (до/после смены режима). Censored anchors исключаются из медианы, считаются отдельно.
+
 **Latency p99**: 99-й перцентиль времени ответа на $10\,000+$ запросах на production hardware; SLA — CPU-only. Выбор архитектуры (параметры HNSW, квантизация) оценивается trade-off recall@K против латентности (раздел 3).
+
+## 12.5.1. Precision@K панель с bootstrap CI
+
+Операционная панель Precision@K включает:
+- Precision@100 / @500 / @1000 с bootstrap 95% CI (percentile method, 600 реплик, seed 72)
+- Base rate на каждом временном шаге
+- Recall@K на новых санкциях (post-train)
+- Cost-based gain vs rule-based baseline: компоненты cost_fp_model, cost_fn_model, cost_baseline, fp_prevented
+
+Доверенные интервалы показывают неопределённость оценки на конечной выборке; CI должен накрывать истинное значение на синтетике.
+
+## 12.5.2. Lead time dashboard
+
+Lead time дашборд показывает:
+- Гистограмму lead time (шаги) с медианой и P90
+- Стратификацию pre/post смены режима (шаг 43 в Elliptic++)
+- Censored count (якори без алерта до санкции)
+- Recall@K на post-train санкциях во времени
+- Тренд медианного lead time (рост → триггер переобучения)
 
 ## 12.6. Метрики стоимости
 
@@ -130,6 +151,8 @@ $$
 ![drift monitoring](./files/11-10-4_drift_monitoring.png)
 
 **Drift monitoring:** KS-статистика во времени; превышение порога — триггер retraining.
+
+**Lead time:** гистограмма lead time (шаги) с медианой и P90, стратификация pre/post regime change (шаг 43 в Elliptic++), censored count (якори без алерта до санкции), Recall@K на post-train санкциях во времени. Рост медианного lead time → триггер переобучения.
 
 Дополнительно: bootstrap CI для PR-AUC/Precision@K/Recall@K и ECE/Brier, гистограммы latency p99, Merkle proof size против $N$.
 

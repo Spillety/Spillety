@@ -5,7 +5,7 @@ _Spill the tea about your transactions._
 KYT-пайплайн для мониторинга криптовалютных транзакций. Решает две ключевые задачи: дорогой инференс на GPU и зависимость от ручной разметки. Подход основан на публичных санкционных списках как системе координат, индуктивных графовых представлениях и cost-based принятии решений. 
 
 | Показатель | Общепринятый подход | Подход Spillety |
-|---|---|---|---|
+|---|---|---|
 | Разметка | Ручная экспертиза аналитиков | Публичные санкционные списки как система координат | 
 | Представления | Ручные признаки или GNN с дообучением на новых данных | Индуктивный графовый энкодер и контрастивное обучение |
 | Поиск | Эвристики и перебор с последующей фильтрацией | Поиск близких anchors в пространстве представлений | 
@@ -40,7 +40,8 @@ make notebooks   # pip install -r docs/notebooks/requirements-notebooks.txt
 
 # Метрики
 
-### RF Proxy (`12_metrics_dashboard`, train 1–30 / valid 31–40)
+### RF Proxy 
+`12_metrics_dashboard`
 
 | Метрика | Значение | Base rate | Примечание |
 |---|---|---|---|
@@ -49,7 +50,8 @@ make notebooks   # pip install -r docs/notebooks/requirements-notebooks.txt
 | ECE | 0.016 | — | validation set |
 | Precision@100 | 0.98 | — | top-100 retrieval |
 
-### LightGBM Focal (`05_gbdt_calibration`, train 1–30 / valid 31–40)
+### LightGBM Focal 
+`05_gbdt_calibration`
 
 | Метрика | Значение | Base rate | Примечание |
 |---|---|---|---|
@@ -57,7 +59,8 @@ make notebooks   # pip install -r docs/notebooks/requirements-notebooks.txt
 | Precision | 0.955 | 0.053 | best-F1 |
 | Recall | 0.569 | 0.053 | best-F1 |
 
-### Ensemble v3 (`13_end_to_end`, test steps 41–49)
+### Ensemble v3 
+`13_end_to_end`
 
 | Метрика | Значение | Base rate | Примечание |
 |---|---|---|---|
@@ -65,7 +68,7 @@ make notebooks   # pip install -r docs/notebooks/requirements-notebooks.txt
 | ECE | 0.011 | 0.053 | temporal test split 41–49 |
 | Precision@100 | 1.0 | 0.053 | test steps 41–49 |
 
-*Weber et al. 2019 (Skip-GCN, темпоральный сплит 70:30). У нас строже: тест — последние 9 шагов, доля illicit другая.*
+*Weber et al. 2019 (Skip-GCN, темпоральный сплит 70:30). У нас строже, потому что тест — последние 9 шагов, а доля illicit другая.*
 
 *Base rate — доля illicit-классов в соответствующей оценочной выборке. RF Proxy и LightGBM оценены на validation (шаги 31–40), Ensemble v3 — на test (шаги 41–49).*
 

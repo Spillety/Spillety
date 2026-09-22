@@ -90,3 +90,5 @@ make notebooks   # pip install -r docs/notebooks/requirements-notebooks.txt
 ![Reliability](./docs/img/reliability.png)
 
 ![Walk-forward](./docs/img/walkforward.png)
+
+![Metrics bars](./docs/img/metrics_bars.png)

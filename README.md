@@ -68,8 +68,21 @@ make notebooks   # pip install -r docs/notebooks/requirements-notebooks.txt
 | ECE | 0.011 | 0.053 | temporal test split 41–49 |
 | Precision@100 | 1.0 | 0.053 | test steps 41–49 |
 
-*Weber et al. 2019 (Skip-GCN, темпоральный сплит 70:30). У нас строже, потому что тест — последние 9 шагов, а доля illicit другая.*
+### В сравнении
 
+| Метрика | Weber et al. 2019 (Skip-GCN)  | Inspection-L (RF + DGI)  | Random Forest (raw features)  | Spillety |
+|---|---|---|---|---|
+| F1 illicit | 0.705 | 0.712 | ~0.71 | 0.681 (best-F1, τ=0.223) / 0.713 (LightGBM Focal, τ=0.671) |
+| Precision | — | — | — | 0.872 / 0.955 |
+| Recall | — | 0.797 | — | 0.559 / 0.569 |
+| ROC-AUC | — | — | — | 0.864 |
+| PR-AUC | — | — | — | 0.632 / 0.647 / 0.656 |
+| Precision@100 | — | — | — | 0.98 / 1.0 |
+
+*Weber et al. 2019 — оригинальная работа с датасетом Elliptic, Skip-GCN показал F1 = 0.705 . Это академический baseline, на который ссылаются практически все последующие работы.*
+*Inspection-L (2022) — self-supervised GNN (DGI) + Random Forest на эмбеддингах, F1 = 0.712, Recall = 0.797 . Результат на том же датасете, но с другим протоколом.*
+*Random Forest на raw features — под строгим индуктивным протоколом RF на 165-мерных признаках показывает F1 около 0.71 и остаётся сильнейшим baseline на Elliptic, обгоняя большинство GNN-подходов. Но это сравнение немного некорректно, так как конкретно в этом датасете Elliptic средняя степень вершин 2.3, следовательно, вершины слабо влияют друг на друга.*
+*Spillety — две конфигурации: best-F1 на validation (F1 = 0.681, Precision 0.872, Recall 0.559) и LightGBM Focal (F1 = 0.713, Precision 0.955, Recall 0.569). PR-AUC 0.656 на temporal test split 41–49.*
 *Base rate — доля illicit-классов в соответствующей оценочной выборке. RF Proxy и LightGBM оценены на validation (шаги 31–40), Ensemble v3 — на test (шаги 41–49).*
 
 ![PR curve](./docs/img/pr_curve.png)
